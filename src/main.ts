@@ -2,7 +2,7 @@ import './style.css';
 import { createController, initialState, type AppState } from './app/controller';
 import { currentScore, elapsed, type Session } from './app/session';
 import { createStore } from './app/store';
-import type { DrawMode } from './engine';
+import { hasUsefulMoves, isStuck, type DrawMode } from './engine';
 import { createBoard, preloadCards } from './ui/board';
 import { showDialog, statList } from './ui/dialog';
 import { formatDuration, formatNumber } from './ui/format';
@@ -63,17 +63,37 @@ function render(state: AppState, previous?: AppState): void {
 }
 
 async function chooseNewGame(): Promise<void> {
+  const { session, drawMode } = store.get();
+  const midGame = session.status === 'playing' || session.status === 'paused';
+  const warn = midGame && hasUsefulMoves(session.game.state);
   const choice = await showDialog<DrawMode | null>({
-    title: 'New game',
-    body: 'Choose how many cards to draw from the stock.',
+    title: warn ? 'Moves are still available' : 'New game',
+    body: warn
+      ? 'Redeal anyway? This game will be recorded as abandoned.'
+      : 'Choose how many cards to draw from the stock.',
     actions: [
-      { label: 'Cancel', value: null },
-      { label: 'Draw 1', value: 1, variant: store.get().drawMode === 1 ? 'primary' : 'secondary' },
-      { label: 'Draw 3', value: 3, variant: store.get().drawMode === 3 ? 'primary' : 'secondary' },
+      { label: warn ? 'Keep playing' : 'Cancel', value: null },
+      { label: 'Draw 1', value: 1, variant: drawMode === 1 ? 'primary' : 'secondary' },
+      { label: 'Draw 3', value: 3, variant: drawMode === 3 ? 'primary' : 'secondary' },
     ],
     dismissValue: null,
   });
   if (choice !== null) controller.newGame(choice);
+}
+
+async function offerWayOut(): Promise<void> {
+  const choice = await showDialog<'undo' | 'new' | null>({
+    title: 'No moves left',
+    body: 'Nothing useful can be played on the board or from the stock.',
+    actions: [
+      { label: 'Close', value: null },
+      { label: 'Undo', value: 'undo' },
+      { label: 'New game', value: 'new', variant: 'primary' },
+    ],
+    dismissValue: null,
+  });
+  if (choice === 'undo') controller.undo();
+  if (choice === 'new') controller.newGame(store.get().drawMode);
 }
 
 async function celebrate(session: Session): Promise<void> {
@@ -96,8 +116,15 @@ async function celebrate(session: Session): Promise<void> {
 
 store.subscribe((state, previous) => {
   render(state, previous);
-  if (state.session.status === 'won' && previous.session.status !== 'won') {
-    void celebrate(state.session);
+  const { session } = state;
+  if (session.status === 'won' && previous.session.status !== 'won') {
+    void celebrate(session);
+  } else if (
+    session.status === 'playing' &&
+    session.game.state !== previous.session.game.state &&
+    isStuck(session.game.state)
+  ) {
+    void offerWayOut();
   }
 });
 
