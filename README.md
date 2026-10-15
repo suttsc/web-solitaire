@@ -31,7 +31,6 @@ Add `?seed=123&draw=1` to the URL to deal a specific game.
 
 ```sh
 npx wrangler login
-npx wrangler d1 create solitaire        # paste the printed database_id into wrangler.jsonc
 npm run db:migrate:remote
 npm run deploy                          # serves on <name>.<account>.workers.dev
 ```

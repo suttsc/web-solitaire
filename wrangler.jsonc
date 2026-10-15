@@ -14,8 +14,7 @@
     {
       "binding": "DB",
       "database_name": "solitaire",
-      // Replace with the id printed by `npx wrangler d1 create solitaire` before the first deploy.
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "cafd0ec0-56f1-49fe-ba1e-ac28b233b276",
       "migrations_dir": "migrations",
     },
   ],
