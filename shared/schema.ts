@@ -33,11 +33,26 @@ export const PlayerSchema = z.object({
   name: z.string(),
 });
 
+/** What anyone can see about a player. The id is only given to browsers that link or log in. */
+export const PublicPlayerSchema = z.object({ name: z.string() });
+
+export const PasswordSchema = z
+  .string()
+  .min(8, 'Use at least 8 characters')
+  .max(128, 'Use at most 128 characters');
+
 export const CreatePlayerRequestSchema = z.object({ name: PlayerNameSchema });
 export const CreatePlayerResponseSchema = z.object({
   player: PlayerSchema,
   created: z.boolean(),
 });
+
+export const ClaimRequestSchema = z.object({ playerId: z.uuid(), password: PasswordSchema });
+export const LoginRequestSchema = z.object({
+  name: PlayerNameSchema,
+  password: z.string().min(1).max(128),
+});
+export const AuthResponseSchema = z.object({ player: PlayerSchema, token: z.string() });
 
 export const UploadGamesRequestSchema = z.object({
   playerId: z.uuid(),
@@ -46,7 +61,7 @@ export const UploadGamesRequestSchema = z.object({
 export const UploadGamesResponseSchema = z.object({ stored: z.array(z.uuid()) });
 
 export const PlayerGamesResponseSchema = z.object({
-  player: PlayerSchema,
+  player: PublicPlayerSchema,
   games: z.array(GameRecordSchema),
 });
 

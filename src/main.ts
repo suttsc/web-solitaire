@@ -12,7 +12,15 @@ import { createBoard, preloadCards } from './ui/board';
 import { showDialog, statList } from './ui/dialog';
 import { formatDuration, formatNumber } from './ui/format';
 import { sounds } from './ui/sound';
-import { actionButton, el, nameField, showLeaderboard, showStats, toggleRow } from './ui/screens';
+import {
+  accountSection,
+  actionButton,
+  el,
+  showLeaderboard,
+  showStats,
+  toggleRow,
+} from './ui/screens';
+import { findWinnableDeal } from './winnable';
 
 const SYNC_EVERY_MS = 3 * 60_000;
 
@@ -42,8 +50,8 @@ async function main(): Promise<void> {
   const store = createStore<AppState>(initialState(settings, saved ?? undefined));
 
   const player = () => {
-    const { playerId, playerName } = store.get().settings;
-    return playerId && playerName ? { id: playerId, name: playerName } : null;
+    const { playerId, playerName, authToken } = store.get().settings;
+    return playerId && playerName ? { id: playerId, name: playerName, token: authToken } : null;
   };
   const sync = createSync(api, persistence, player);
 
@@ -130,8 +138,25 @@ async function main(): Promise<void> {
     if (reload) apply();
   }
 
+  const dealingOverlay = required('#dealing');
+
   async function newGame(drawMode: DrawMode, seed?: number): Promise<void> {
-    controller.newGame(drawMode, seed);
+    const { settings: current } = store.get();
+    let chosen = seed;
+    if (chosen === undefined && current.winnableOnly) {
+      dealingOverlay.hidden = false;
+      chosen = (await findWinnableDeal(drawMode, current.scoringMode)) ?? undefined;
+      dealingOverlay.hidden = true;
+      if (chosen === undefined) {
+        await showDialog({
+          title: 'Random deal',
+          body: "Couldn't prove a deal winnable in time, so this one is random.",
+          actions: [{ label: 'OK', value: null }],
+          dismissValue: null,
+        });
+      }
+    }
+    controller.newGame(drawMode, chosen);
     await offerUpdate();
   }
 
@@ -191,23 +216,63 @@ async function main(): Promise<void> {
   async function openSettings(): Promise<void> {
     const body = el('div', 'space-y-5');
     body.append(
-      nameField({
-        current: store.get().settings.playerName,
-        async link(name) {
-          const { player: linked, created } = await sync.link(name);
-          controller.updateSettings({ playerId: linked.id, playerName: linked.name });
-          await sync.flush();
-          return created
-            ? `Welcome, ${linked.name}! Your games will sync to this name.`
-            : `Linked to ${linked.name}. Their history is now on this device.`;
+      accountSection(
+        {
+          name: store.get().settings.playerName,
+          protected: store.get().settings.authToken !== null,
         },
-      }),
+        {
+          async link(name) {
+            const { player: linked, created } = await sync.link(name);
+            controller.updateSettings({
+              playerId: linked.id,
+              playerName: linked.name,
+              authToken: null,
+            });
+            await sync.flush();
+            return created
+              ? `Welcome, ${linked.name}! Your games will sync to this name.`
+              : `Linked to ${linked.name}. Their history is now on this device.`;
+          },
+          async login(name, password) {
+            const { player: linked, token } = await sync.login(name, password);
+            controller.updateSettings({
+              playerId: linked.id,
+              playerName: linked.name,
+              authToken: token,
+            });
+            await sync.flush();
+            return `Signed in as ${linked.name}. Your history is now on this device.`;
+          },
+          async protect(password) {
+            const { playerId } = store.get().settings;
+            if (!playerId) throw new Error('No player linked');
+            const { token } = await api.claim(playerId, password);
+            controller.updateSettings({ authToken: token });
+            return 'Your name is protected. Use this password to sign in on other devices.';
+          },
+          async logout() {
+            const { authToken } = store.get().settings;
+            if (authToken) await api.logout(authToken).catch(() => undefined);
+            controller.updateSettings({ playerId: null, playerName: null, authToken: null });
+            return 'Signed out. Games on this device stay here.';
+          },
+        },
+      ),
     );
     const { settings: current } = store.get();
     body.append(
       toggleRow('Sound', 'Card and win sounds', current.sound, (sound) => {
         controller.updateSettings({ sound });
       }),
+      toggleRow(
+        'Winnable deals only',
+        'The solver checks each deal can be won before dealing it.',
+        current.winnableOnly,
+        (winnableOnly) => {
+          controller.updateSettings({ winnableOnly });
+        },
+      ),
       toggleRow(
         'Vegas scoring',
         'Pay 52 to play, earn 5 per card home, limited passes. Applies from the next game.',

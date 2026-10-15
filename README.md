@@ -8,6 +8,9 @@ Hono API on Cloudflare Workers backed by D1. The app and API ship as a single Wo
 - No hints. Redealing mid-game warns if useful moves remain; a stuck game offers undo or a new deal.
 - Games are saved locally (IndexedDB) after every move and resume after closing the app.
 - Finished games sync to D1 once you add a name; stats and leaderboards work across browsers.
+- Optional password protects your name; other browsers then sign in with it.
+- Extras: auto-complete, sounds, replay any past deal, Vegas scoring, and "winnable deals only"
+  (a solver in a Web Worker proves each deal can be won before dealing it).
 
 ## Requirements
 
@@ -57,7 +60,7 @@ If Playwright can't download its browser, point it at an installed Chromium with
 ## Layout
 
 ```
-src/engine/   Pure game rules: deal, moves, scoring, undo, move detection. No DOM, storage or network.
+src/engine/   Pure game rules: deal, moves, scoring, undo, move detection, solver. No DOM, storage or network.
 src/app/      Session (game + clock), tiny store and controller turning taps into moves.
 src/data/     Dexie (IndexedDB) persistence, typed API client and the sync queue.
 src/ui/       Layout maths, board rendering/input, dialogs and screens.
@@ -68,6 +71,13 @@ e2e/          Playwright specs.
 public/cards/ CC0 card artwork (see its LICENSE.md).
 ```
 
-## Known limitation
+## Accounts
 
-There's no login yet: anyone who types your name can post games as you. Fine while it's just you.
+A name on its own is unprotected: anyone who types it can link to it, which is fine while it's just
+you. Setting a password in Settings protects it. After that, linking the name needs the password,
+uploads need the session token, and other browsers sign in with the name and password. Passwords
+are hashed with PBKDF2-SHA256 (100k iterations, per-user salt); only SHA-256 hashes of session
+tokens are stored.
+
+Not yet in place: rate limiting on `/api/auth/login` (consider a Cloudflare rate-limiting rule),
+password reset (there's no email), and changing a password.

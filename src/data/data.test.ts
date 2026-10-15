@@ -124,7 +124,7 @@ describe('api client', () => {
 });
 
 describe('sync', () => {
-  const player = { id: crypto.randomUUID(), name: 'Chris' };
+  const player = { id: crypto.randomUUID(), name: 'Chris', token: null };
 
   const fakeApi = () => {
     const uploaded: GameRecord[][] = [];
@@ -174,7 +174,7 @@ describe('sync', () => {
     const api = {
       ...createApi(() => Promise.reject(new Error('unused'))),
       linkPlayer: vi.fn(() => Promise.resolve({ player, created: false })),
-      playerGames: vi.fn(() => Promise.resolve({ player, games: [remote] })),
+      playerGames: vi.fn(() => Promise.resolve({ player: { name: 'Chris' }, games: [remote] })),
     };
     const result = await createSync(api, persistence, () => null).link('chris');
     expect(result.player).toEqual(player);

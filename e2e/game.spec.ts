@@ -77,9 +77,9 @@ test('warns before redealing and records the abandoned game', async ({ page }) =
 
   await page.getByRole('button', { name: 'Stats' }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByText('Played').locator('xpath=following-sibling::dd[1]')).toHaveText(
-    '1',
-  );
+  await expect(
+    dialog.getByText('Played', { exact: true }).locator('xpath=following-sibling::dd[1]'),
+  ).toHaveText('1');
 });
 
 test('still loads offline once installed', async ({ page, context }) => {

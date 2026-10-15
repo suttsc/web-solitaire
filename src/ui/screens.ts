@@ -1,5 +1,6 @@
 import type { DrawModeValue, LeaderboardMetric } from '../../shared/schema';
-import { PlayerNameSchema } from '../../shared/schema';
+import { PasswordSchema, PlayerNameSchema } from '../../shared/schema';
+import { ApiError } from '../data/api';
 import { computeStats } from '../../shared/stats';
 import type { Api } from '../data/api';
 import type { LocalGame } from '../data/db';
@@ -232,65 +233,186 @@ export async function showLeaderboard(
   });
 }
 
-export interface NameFieldOptions {
-  readonly current: string | null;
-  readonly link: (name: string) => Promise<string>;
+export interface Account {
+  readonly name: string | null;
+  readonly protected: boolean;
 }
 
-/** Name entry that links this browser to a player (and pulls their history). */
-export function nameField({ current, link }: NameFieldOptions): HTMLElement {
-  const form = el('form', 'space-y-2');
-  const label = el('label', 'block text-sm font-medium text-white', 'Your name');
-  const row = el('div', 'flex gap-2');
+export interface AccountActions {
+  /** Link to a name. Resolves to a status line, or rejects with ApiError 409 for a protected name. */
+  link(name: string): Promise<string>;
+  login(name: string, password: string): Promise<string>;
+  protect(password: string): Promise<string>;
+  logout(): Promise<string>;
+}
+
+function textInput(id: string, type: 'text' | 'password', placeholder: string, value = '') {
   const input = el(
     'input',
-    'min-h-11 min-w-0 flex-1 rounded-xl border border-white/20 bg-black/20 px-3 text-white placeholder:text-white/40',
+    'min-h-11 w-full min-w-0 rounded-xl border border-white/20 bg-black/20 px-3 text-white placeholder:text-white/40',
   );
-  input.name = 'name';
-  input.autocomplete = 'username';
-  input.placeholder = 'Shown on the leaderboard';
-  input.value = current ?? '';
-  label.htmlFor = input.id = 'player-name';
-  const save = el(
-    'button',
-    'min-h-11 rounded-xl bg-amber-400 px-4 text-sm font-semibold text-stone-900',
-    'Save',
-  );
-  save.type = 'submit';
-  const message = el(
-    'p',
-    'text-xs text-white/60',
-    current
-      ? `Playing as ${current}. Your games sync to this name.`
-      : 'Add a name to sync your games and join the leaderboard.',
-  );
-  row.append(input, save);
-  form.append(label, row, message);
+  input.id = id;
+  input.type = type;
+  input.placeholder = placeholder;
+  input.value = value;
+  input.autocomplete = type === 'password' ? 'current-password' : 'username';
+  return input;
+}
 
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
-    const parsed = PlayerNameSchema.safeParse(input.value);
-    if (!parsed.success) {
-      message.textContent = parsed.error.issues[0]?.message ?? 'Invalid name';
-      return;
-    }
-    save.disabled = true;
-    message.textContent = 'Linking…';
-    link(parsed.data)
+function submitButton(text: string): HTMLButtonElement {
+  const button = el(
+    'button',
+    'min-h-11 shrink-0 rounded-xl bg-amber-400 px-4 text-sm font-semibold text-stone-900 disabled:opacity-60',
+    text,
+  );
+  button.type = 'submit';
+  return button;
+}
+
+const errorText = (error: unknown): string =>
+  error instanceof ApiError
+    ? error.message
+    : "Couldn't reach the server. Try again when you're online.";
+
+/**
+ * Name and password management. A name works on its own (anyone can type it); adding a
+ * password protects it, and other browsers then log in with it.
+ */
+export function accountSection(account: Account, actions: AccountActions): HTMLElement {
+  const section = el('div', 'space-y-3');
+  const message = el('p', 'text-xs text-white/60');
+  let state: Account & { needsLogin: string | null } = { ...account, needsLogin: null };
+
+  const run = (button: HTMLButtonElement, task: () => Promise<string>, next?: () => void) => {
+    button.disabled = true;
+    message.textContent = 'Working…';
+    task()
       .then(
         (text) => {
+          next?.();
           message.textContent = text;
         },
-        () => {
-          message.textContent = "Couldn't reach the server. Try again when you're online.";
+        (error: unknown) => {
+          if (error instanceof ApiError && error.status === 409 && state.needsLogin === null) {
+            const input = section.querySelector<HTMLInputElement>('#player-name');
+            state = { ...state, needsLogin: input?.value.trim() ?? '' };
+            render();
+            message.textContent = 'This name is protected. Enter its password to log in.';
+            return;
+          }
+          message.textContent = errorText(error);
         },
       )
       .finally(() => {
-        save.disabled = false;
+        button.disabled = false;
       });
-  });
+  };
 
-  return form;
+  function form(
+    label: string,
+    input: HTMLInputElement,
+    button: HTMLButtonElement,
+    onSubmit: () => void,
+  ) {
+    const node = el('form', 'space-y-1.5');
+    const caption = el('label', 'block text-sm font-medium text-white', label);
+    caption.htmlFor = input.id;
+    const row = el('div', 'flex gap-2');
+    row.append(input, button);
+    node.append(caption, row);
+    node.addEventListener('submit', (event) => {
+      event.preventDefault();
+      onSubmit();
+    });
+    return node;
+  }
+
+  function render(): void {
+    section.replaceChildren();
+
+    if (state.needsLogin !== null) {
+      const password = textInput('player-password', 'password', 'Password');
+      const button = submitButton('Log in');
+      const name = state.needsLogin;
+      section.append(
+        form(`Log in as ${name}`, password, button, () => {
+          run(
+            button,
+            () => actions.login(name, password.value),
+            () => {
+              state = { name, protected: true, needsLogin: null };
+              render();
+            },
+          );
+        }),
+      );
+    } else if (state.name && state.protected) {
+      const button = actionButton('Log out', () => {
+        run(
+          button,
+          () => actions.logout(),
+          () => {
+            state = { name: null, protected: false, needsLogin: null };
+            render();
+          },
+        );
+      });
+      section.append(el('p', 'text-sm text-white', `Signed in as ${state.name}.`), button);
+    } else {
+      const name = textInput('player-name', 'text', 'Shown on the leaderboard', state.name ?? '');
+      const button = submitButton('Save');
+      section.append(
+        form('Your name', name, button, () => {
+          const parsed = PlayerNameSchema.safeParse(name.value);
+          if (!parsed.success) {
+            message.textContent = parsed.error.issues[0]?.message ?? 'Invalid name';
+            return;
+          }
+          run(
+            button,
+            () => actions.link(parsed.data),
+            () => {
+              state = { name: parsed.data, protected: false, needsLogin: null };
+              render();
+            },
+          );
+        }),
+      );
+
+      if (state.name) {
+        const password = textInput('player-new-password', 'password', 'At least 8 characters');
+        password.autocomplete = 'new-password';
+        const protect = submitButton('Protect');
+        section.append(
+          form('Password (stops anyone else using your name)', password, protect, () => {
+            const parsed = PasswordSchema.safeParse(password.value);
+            if (!parsed.success) {
+              message.textContent = parsed.error.issues[0]?.message ?? 'Invalid password';
+              return;
+            }
+            run(
+              protect,
+              () => actions.protect(parsed.data),
+              () => {
+                state = { ...state, protected: true };
+                render();
+              },
+            );
+          }),
+        );
+      }
+    }
+
+    if (!message.textContent) {
+      message.textContent = state.name
+        ? `Your games sync to ${state.name}.`
+        : 'Add a name to sync your games and join the leaderboard.';
+    }
+    section.append(message);
+  }
+
+  render();
+  return section;
 }
 
 export function toggleRow(

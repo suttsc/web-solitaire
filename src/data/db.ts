@@ -28,6 +28,8 @@ export interface Settings {
   readonly winnableOnly: boolean;
   readonly playerId: string | null;
   readonly playerName: string | null;
+  /** Session token after setting or entering a password; null for an unprotected name. */
+  readonly authToken: string | null;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   winnableOnly: false,
   playerId: null,
   playerName: null,
+  authToken: null,
 };
 
 interface SettingsRow extends Settings {

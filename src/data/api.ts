@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import {
+  AuthResponseSchema,
   CreatePlayerResponseSchema,
   GlobalStatsResponseSchema,
   LeaderboardResponseSchema,
@@ -45,11 +46,31 @@ export function createApi(fetchImpl: Fetch = (...args) => fetch(...args), base =
     playerGames: (name: string) =>
       call(PlayerGamesResponseSchema, `/players/${encodeURIComponent(name)}/games`),
 
-    uploadGames: (playerId: string, games: readonly GameRecord[]) =>
+    uploadGames: (playerId: string, games: readonly GameRecord[], token: string | null = null) =>
       call(UploadGamesResponseSchema, '/games', {
         method: 'POST',
         body: JSON.stringify({ playerId, games }),
+        headers: token ? { authorization: `Bearer ${token}` } : {},
       }),
+
+    claim: (playerId: string, password: string) =>
+      call(AuthResponseSchema, '/auth/claim', {
+        method: 'POST',
+        body: JSON.stringify({ playerId, password }),
+      }),
+
+    login: (name: string, password: string) =>
+      call(AuthResponseSchema, '/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ name, password }),
+      }),
+
+    async logout(token: string): Promise<void> {
+      await fetchImpl(`${base}/auth/logout`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+      });
+    },
 
     leaderboard: (drawMode: DrawModeValue, by: LeaderboardMetric) =>
       call(LeaderboardResponseSchema, `/leaderboard?draw=${drawMode}&by=${by}`),

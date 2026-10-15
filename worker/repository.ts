@@ -52,8 +52,53 @@ const LEADERBOARD_SQL: Record<LeaderboardMetric, string> = {
           GROUP BY g.player_id ORDER BY value DESC, endedAt ASC LIMIT ?`,
 };
 
+interface PlayerAuthRow {
+  id: string;
+  name: string;
+  password_hash: string | null;
+}
+
 export function createRepository(db: D1Database) {
   return {
+    async findPlayerAuth(by: 'id' | 'name', value: string): Promise<PlayerAuthRow | null> {
+      const where = by === 'id' ? 'id = ?' : 'name = ? COLLATE NOCASE';
+      return db
+        .prepare(`SELECT id, name, password_hash FROM players WHERE ${where}`)
+        .bind(value)
+        .first<PlayerAuthRow>();
+    },
+
+    /** Protect a player with a password, unless someone already has. */
+    async setPasswordIfUnset(playerId: string, passwordHash: string): Promise<boolean> {
+      const result = await db
+        .prepare('UPDATE players SET password_hash = ? WHERE id = ? AND password_hash IS NULL')
+        .bind(passwordHash, playerId)
+        .run();
+      return result.meta.changes > 0;
+    },
+
+    async createSession(playerId: string, tokenHash: string, expiresAt: string): Promise<void> {
+      await db
+        .prepare(
+          'INSERT INTO sessions (token_hash, player_id, created_at, expires_at) VALUES (?, ?, ?, ?)',
+        )
+        .bind(tokenHash, playerId, new Date().toISOString(), expiresAt)
+        .run();
+    },
+
+    /** The player a live session token belongs to, or null. */
+    async sessionPlayerId(tokenHash: string): Promise<string | null> {
+      const row = await db
+        .prepare('SELECT player_id FROM sessions WHERE token_hash = ? AND expires_at > ?')
+        .bind(tokenHash, new Date().toISOString())
+        .first<{ player_id: string }>();
+      return row?.player_id ?? null;
+    },
+
+    async deleteSession(tokenHash: string): Promise<void> {
+      await db.prepare('DELETE FROM sessions WHERE token_hash = ?').bind(tokenHash).run();
+    },
+
     async findPlayerByName(name: string): Promise<Player | null> {
       return db
         .prepare('SELECT id, name FROM players WHERE name = ? COLLATE NOCASE')
