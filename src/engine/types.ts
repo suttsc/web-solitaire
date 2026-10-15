@@ -15,17 +15,24 @@ export type Pile = readonly Card[];
 
 export type DrawMode = 1 | 3;
 
+/** Standard (Windows-style points) or Vegas (pay per card, limited passes). */
+export type ScoringMode = 'standard' | 'vegas';
+
 export const FOUNDATION_COUNT = 4;
 export const TABLEAU_COUNT = 7;
 
 export interface GameState {
   readonly seed: number;
   readonly drawMode: DrawMode;
+  readonly scoring: ScoringMode;
   readonly stock: Pile;
   readonly waste: Pile;
   readonly foundations: readonly Pile[];
   readonly tableau: readonly Pile[];
-  /** Points earned from moves, never below zero. Time penalty and win bonus are applied on top. */
+  /**
+   * Points from moves. Standard: never below zero, with time penalty and win bonus applied on top.
+   * Vegas: starts at the ante and can go negative.
+   */
   readonly score: number;
   readonly moves: number;
   /** Number of times the waste has been recycled into the stock. */

@@ -1,5 +1,5 @@
 import { canPlaceOnFoundation, canStackOnTableau, isMovableRun, topCard } from './rules';
-import { SCORING, movePoints } from './scoring';
+import { canRecycle, flipPoints, movePoints } from './scoring';
 import type { Card, GameState, Move, Pile } from './types';
 
 export class IllegalMoveError extends Error {
@@ -29,11 +29,13 @@ function commit(
   flipped = false,
 ): GameState {
   const points =
-    movePoints(move.type, state.drawMode) + (flipped ? SCORING.turnOverTableauCard : 0);
+    movePoints(move.type, state.drawMode, state.scoring) +
+    (flipped ? flipPoints(state.scoring) : 0);
+  const score = state.score + points;
   return {
     ...state,
     ...changes,
-    score: Math.max(0, state.score + points),
+    score: state.scoring === 'vegas' ? score : Math.max(0, score),
     moves: state.moves + 1,
   };
 }
@@ -51,7 +53,7 @@ export function tryMove(state: GameState, move: Move): GameState | null {
     }
 
     case 'recycle': {
-      if (stock.length > 0 || waste.length === 0) return null;
+      if (stock.length > 0 || waste.length === 0 || !canRecycle(state)) return null;
       return commit(state, move, {
         stock: [...waste].reverse().map(faceDown),
         waste: [],

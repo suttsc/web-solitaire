@@ -6,12 +6,13 @@ import { createApi } from './data/api';
 import { SolitaireDb } from './data/db';
 import { createPersistence, toGameRecord } from './data/persistence';
 import { createSync } from './data/sync';
-import { hasUsefulMoves, isStuck, type DrawMode } from './engine';
+import { canAutoComplete, hasUsefulMoves, isStuck, type DrawMode } from './engine';
 import { canInstall, install, registerServiceWorker, requestPersistentStorage } from './pwa';
 import { createBoard, preloadCards } from './ui/board';
 import { showDialog, statList } from './ui/dialog';
 import { formatDuration, formatNumber } from './ui/format';
-import { actionButton, el, nameField, showLeaderboard, showStats } from './ui/screens';
+import { sounds } from './ui/sound';
+import { actionButton, el, nameField, showLeaderboard, showStats, toggleRow } from './ui/screens';
 
 const SYNC_EVERY_MS = 3 * 60_000;
 
@@ -66,7 +67,27 @@ async function main(): Promise<void> {
   };
 
   preloadCards();
-  const board = createBoard(boardEl, controller);
+  const autoCompleteButton = required('#autocomplete') as HTMLButtonElement;
+  const soundOn = () => store.get().settings.sound;
+  const board = createBoard(boardEl, {
+    tapStock: () => controller.tapStock(),
+    tapCard: (pile, index) => controller.tapCard(pile, index),
+    tapSlot: (pile) => controller.tapSlot(pile),
+    doubleTapCard: (pile, index) => controller.doubleTapCard(pile, index),
+    drop(source, target) {
+      if (!controller.drop(source, target) && target && soundOn()) sounds.invalid();
+    },
+  });
+
+  /** Play the remaining cards to the foundations one by one so the player sees them go. */
+  function runAutoComplete(): void {
+    autoCompleteButton.hidden = true;
+    const step = () => {
+      if (controller.autoCompleteStep()) setTimeout(step, 110);
+    };
+    step();
+  }
+  autoCompleteButton.addEventListener('click', runAutoComplete);
 
   function renderHud(session: Session): void {
     const now = Date.now();
@@ -89,6 +110,8 @@ async function main(): Promise<void> {
     renderHud(session);
     pauseOverlay.hidden = session.status !== 'paused';
     undoButton.disabled = session.status !== 'playing' || session.game.history.length === 0;
+    autoCompleteButton.hidden =
+      session.status !== 'playing' || !canAutoComplete(session.game.state);
   }
 
   async function offerUpdate(): Promise<void> {
@@ -180,6 +203,20 @@ async function main(): Promise<void> {
         },
       }),
     );
+    const { settings: current } = store.get();
+    body.append(
+      toggleRow('Sound', 'Card and win sounds', current.sound, (sound) => {
+        controller.updateSettings({ sound });
+      }),
+      toggleRow(
+        'Vegas scoring',
+        'Pay 52 to play, earn 5 per card home, limited passes. Applies from the next game.',
+        current.scoringMode === 'vegas',
+        (vegas) => {
+          controller.updateSettings({ scoringMode: vegas ? 'vegas' : 'standard' });
+        },
+      ),
+    );
     if (canInstall()) {
       const button = actionButton('Install app', () => {
         void install().then(() => {
@@ -205,6 +242,11 @@ async function main(): Promise<void> {
       void (session.status === 'won'
         ? db.current.clear()
         : persistence.saveSession(session, Date.now()));
+    }
+
+    if (state.settings.sound && session.id === previous.session.id) {
+      if (session.status === 'won' && previous.session.status !== 'won') sounds.win();
+      else if (session.game.state.moves > previous.session.game.state.moves) sounds.place();
     }
 
     if (session.status === 'won' && previous.session.status !== 'won') {
@@ -233,7 +275,12 @@ async function main(): Promise<void> {
     new: chooseNewGame,
     undo: () => controller.undo(),
     stats: async () =>
-      showStats(await persistence.allGames(), api, store.get().session.game.state.drawMode),
+      showStats(
+        await persistence.allGames(),
+        api,
+        store.get().session.game.state.drawMode,
+        (game) => void newGame(game.drawMode, game.seed),
+      ),
     leaderboard: () =>
       showLeaderboard(
         api,

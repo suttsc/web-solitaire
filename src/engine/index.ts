@@ -8,3 +8,4 @@ export * from './scoring';
 export * from './types';
 export * from './targets';
 export * from './detect';
+export * from './autocomplete';

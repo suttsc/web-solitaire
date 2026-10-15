@@ -1,4 +1,5 @@
 import { createRng } from './rng';
+import { VEGAS } from './scoring';
 import {
   FOUNDATION_COUNT,
   RANKS,
@@ -7,6 +8,7 @@ import {
   type Card,
   type DrawMode,
   type GameState,
+  type ScoringMode,
 } from './types';
 
 export function createDeck(): Card[] {
@@ -25,7 +27,11 @@ export function shuffle<T>(items: readonly T[], seed: number): T[] {
 }
 
 /** Deal a new Klondike game: column n gets n + 1 cards with only the top one face up. */
-export function deal(seed: number, drawMode: DrawMode): GameState {
+export function deal(
+  seed: number,
+  drawMode: DrawMode,
+  scoring: ScoringMode = 'standard',
+): GameState {
   const deck = shuffle(createDeck(), seed);
   const tableau: Card[][] = [];
   let next = 0;
@@ -43,11 +49,12 @@ export function deal(seed: number, drawMode: DrawMode): GameState {
   return {
     seed,
     drawMode,
+    scoring,
     stock: deck.slice(next),
     waste: [],
     foundations: Array.from({ length: FOUNDATION_COUNT }, () => []),
     tableau,
-    score: 0,
+    score: scoring === 'vegas' ? VEGAS.ante : 0,
     moves: 0,
     passes: 0,
   };

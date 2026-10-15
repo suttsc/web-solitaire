@@ -20,7 +20,7 @@ export function toGameRecord(
     id: session.id,
     seed: state.seed,
     drawMode: state.drawMode,
-    scoringMode: session.scoringMode,
+    scoringMode: session.game.state.scoring,
     startedAt: session.startedAt ?? new Date(now).toISOString(),
     endedAt: new Date(now).toISOString(),
     durationMs: Math.round(elapsed(session, now)),
@@ -39,7 +39,7 @@ export function toSaved(session: Session, now: number): SavedSession {
     id: session.id,
     seed: state.seed,
     drawMode: state.drawMode,
-    scoringMode: session.scoringMode,
+    scoringMode: session.game.state.scoring,
     // A game left running comes back paused, so the clock never counts time the app was closed.
     status: session.status === 'playing' ? 'paused' : session.status,
     elapsedMs: elapsed(session, now),
@@ -54,8 +54,7 @@ export function fromSaved(saved: SavedSession): Session | null {
   try {
     return {
       id: saved.id,
-      game: replay(saved.seed, saved.drawMode, saved.log),
-      scoringMode: saved.scoringMode,
+      game: replay(saved.seed, saved.drawMode, saved.log, saved.scoringMode),
       status: saved.status,
       elapsedMs: saved.elapsedMs,
       runningSince: null,

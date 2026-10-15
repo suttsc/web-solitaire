@@ -3,6 +3,7 @@ import { DEFAULT_SETTINGS } from '../data/db';
 import { createController, initialState, type AppState } from './controller';
 import { startSession } from './session';
 import { createStore } from './store';
+import { cards, foundationUpTo, makeState } from '../engine/test-helpers';
 
 /** Seed 2 deals the ace of spades face up on column 3; seed 4 has 9♥ (col 2) onto 10♣ (col 0). */
 function setup(seed: number) {
@@ -86,6 +87,37 @@ describe('controller', () => {
     controller.newGame(3, 77);
     expect(finished).toHaveBeenCalledWith(played, 'abandoned', expect.any(Number));
     expect(store.get().session.game.state.seed).toBe(77);
+  });
+
+  it('auto-completes one move at a time until won', () => {
+    const state = makeState({
+      foundations: [
+        foundationUpTo('C', 12),
+        foundationUpTo('D', 13),
+        foundationUpTo('H', 13),
+        foundationUpTo('S', 12),
+      ],
+      tableau: [cards('KC'), cards('KS'), [], [], [], [], []],
+    });
+    const base = startSession('auto', 1, 3);
+    const store = createStore<AppState>(
+      initialState(DEFAULT_SETTINGS, { ...base, game: { ...base.game, state } }),
+    );
+    const finished = vi.fn();
+    const controller = createController(store, { finished }, () => 5_000);
+    expect(controller.autoCompleteStep()).toBe(true);
+    expect(controller.autoCompleteStep()).toBe(true);
+    expect(controller.autoCompleteStep()).toBe(false);
+    expect(store.get().session.status).toBe('won');
+    expect(finished).toHaveBeenCalledWith(expect.anything(), 'won', 5_000);
+  });
+
+  it('deals Vegas games when the setting is on', () => {
+    const { store, controller } = setup(2);
+    controller.updateSettings({ scoringMode: 'vegas' });
+    controller.newGame(3);
+    expect(store.get().session.game.state.scoring).toBe('vegas');
+    expect(store.get().session.game.state.score).toBe(-52);
   });
 
   it('updates settings', () => {

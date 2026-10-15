@@ -1,4 +1,5 @@
 import {
+  autoCompleteMoves,
   foundationMoveFor,
   isStuck,
   legalMoveBetween,
@@ -119,6 +120,11 @@ export function createController(
         playOne(legalMoveBetween(store.get().session.game.state, source, target));
       if (!moved) clearSelection();
       return moved;
+    },
+
+    /** Play the next auto-complete move. Returns false when there's nothing left to play. */
+    autoCompleteStep(): boolean {
+      return playOne(autoCompleteMoves(store.get().session.game.state)[0] ?? null);
     },
 
     undo(): boolean {

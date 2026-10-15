@@ -51,10 +51,59 @@ const orDash = (value: number | null, format: (v: number) => string): string =>
   value === null ? '—' : format(value);
 
 /** Personal stats (from this device, including pulled history) plus global stats from the server. */
+const RESULT_LABELS = { won: 'Won', stuck: 'Stuck', abandoned: 'Abandoned' } as const;
+
+function recentGames(
+  games: readonly LocalGame[],
+  draw: DrawModeValue,
+  onReplay: (game: LocalGame) => void,
+): HTMLElement {
+  const recent = games
+    .filter((game) => game.drawMode === draw)
+    .slice(-8)
+    .reverse();
+  if (recent.length === 0) return el('p', 'text-white/60', 'No games yet.');
+
+  const list = el('ul', 'space-y-1');
+  for (const game of recent) {
+    const row = el(
+      'li',
+      'grid grid-cols-[1fr_auto] items-center gap-3 rounded-lg bg-black/15 px-3 py-2',
+    );
+    const info = el('div', 'min-w-0');
+    info.append(
+      el(
+        'div',
+        'font-medium text-white',
+        `${RESULT_LABELS[game.result]} · ${formatDuration(game.durationMs)} · ${formatNumber(game.moves)} ${game.moves === 1 ? 'move' : 'moves'}`,
+      ),
+      el(
+        'div',
+        'text-xs text-white/60',
+        `${new Date(game.endedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' })} · deal #${String(game.seed)}${game.scoringMode === 'vegas' ? ' · Vegas' : ''}`,
+      ),
+    );
+    const again = el(
+      'button',
+      'min-h-9 rounded-lg bg-white/10 px-3 text-xs font-semibold text-white hover:bg-white/20',
+      'Play again',
+    );
+    again.type = 'button';
+    again.addEventListener('click', () => {
+      again.closest('dialog')?.close();
+      onReplay(game);
+    });
+    row.append(info, again);
+    list.append(row);
+  }
+  return list;
+}
+
 export async function showStats(
   games: readonly LocalGame[],
   api: Api,
   initialDraw: DrawModeValue,
+  onReplay: (game: LocalGame) => void,
 ): Promise<void> {
   const body = el('div', 'space-y-4');
   let draw = initialDraw;
@@ -80,6 +129,8 @@ export async function showStats(
       ]),
       el('h3', 'font-semibold text-white', 'Everyone'),
       global,
+      el('h3', 'font-semibold text-white', 'Recent games'),
+      recentGames(games, draw, onReplay),
     );
 
     const requested = draw;

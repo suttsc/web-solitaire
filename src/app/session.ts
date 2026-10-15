@@ -7,8 +7,8 @@ import {
   type DrawMode,
   type Game,
   type Move,
+  type ScoringMode,
 } from '../engine';
-import type { ScoringMode } from '../../shared/schema';
 
 export type SessionStatus = 'ready' | 'playing' | 'paused' | 'won';
 
@@ -19,7 +19,6 @@ export type SessionStatus = 'ready' | 'playing' | 'paused' | 'won';
 export interface Session {
   readonly id: string;
   readonly game: Game;
-  readonly scoringMode: ScoringMode;
   readonly status: SessionStatus;
   /** Active play time accumulated before `runningSince`. */
   readonly elapsedMs: number;
@@ -37,8 +36,7 @@ export function startSession(
 ): Session {
   return {
     id,
-    game: newGame(seed, drawMode),
-    scoringMode,
+    game: newGame(seed, drawMode, scoringMode),
     status: 'ready',
     elapsedMs: 0,
     runningSince: null,
@@ -50,7 +48,12 @@ export const elapsed = (session: Session, now: number): number =>
   session.elapsedMs + (session.runningSince === null ? 0 : Math.max(0, now - session.runningSince));
 
 export const currentScore = (session: Session, now: number): number =>
-  displayScore(session.game.state.score, elapsed(session, now), session.status === 'won');
+  displayScore(
+    session.game.state.score,
+    elapsed(session, now),
+    session.status === 'won',
+    session.game.state.scoring,
+  );
 
 /** Has the player made a move yet? */
 export const hasStarted = (session: Session): boolean => session.startedAt !== null;

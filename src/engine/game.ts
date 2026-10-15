@@ -1,7 +1,7 @@
 import { tryMove } from './apply';
 import { deal } from './deck';
 import { isWon } from './rules';
-import type { DrawMode, GameState, Move } from './types';
+import type { DrawMode, GameState, Move, ScoringMode } from './types';
 
 /** Everything the player did, in order. Replaying it from the seed rebuilds the game exactly. */
 export type GameAction = Move | { readonly type: 'undo' };
@@ -15,8 +15,8 @@ export interface Game {
   readonly log: readonly GameAction[];
 }
 
-export function newGame(seed: number, drawMode: DrawMode): Game {
-  return { state: deal(seed, drawMode), history: [], undos: 0, log: [] };
+export function newGame(seed: number, drawMode: DrawMode, scoring: ScoringMode = 'standard'): Game {
+  return { state: deal(seed, drawMode, scoring), history: [], undos: 0, log: [] };
 }
 
 /** Play a move. Returns null if it's illegal. */
@@ -47,14 +47,19 @@ export function undo(game: Game): Game | null {
 }
 
 /** Rebuild a game from its seed and action log. Throws if the log doesn't fit the deal. */
-export function replay(seed: number, drawMode: DrawMode, log: readonly GameAction[]): Game {
+export function replay(
+  seed: number,
+  drawMode: DrawMode,
+  log: readonly GameAction[],
+  scoring: ScoringMode = 'standard',
+): Game {
   return log.reduce<Game>(
     (game, action) => {
       const next = action.type === 'undo' ? undo(game) : play(game, action);
       if (!next) throw new Error(`Cannot replay ${JSON.stringify(action)}`);
       return next;
     },
-    newGame(seed, drawMode),
+    newGame(seed, drawMode, scoring),
   );
 }
 

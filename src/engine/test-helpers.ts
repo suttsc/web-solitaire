@@ -32,6 +32,7 @@ export function makeState(overrides: Partial<GameState> = {}): GameState {
   return {
     seed: 1,
     drawMode: 3,
+    scoring: 'standard',
     stock: [],
     waste: [],
     foundations: [[], [], [], []],
