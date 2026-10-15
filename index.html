@@ -95,6 +95,32 @@
           Settings
         </button>
       </nav>
+
+      <form
+        id="theme-bar"
+        hidden
+        class="flex items-center gap-2 px-3 pt-2 pb-3"
+        aria-label="Choose a card style"
+      >
+        <label for="theme-select" class="sr-only">Card style</label>
+        <select
+          id="theme-select"
+          class="min-h-11 min-w-0 flex-1 rounded-xl border border-white/25 bg-felt-dark px-3 text-base text-white"
+        ></select>
+        <button
+          type="button"
+          data-theme-cancel
+          class="min-h-11 rounded-xl bg-white/10 px-4 text-sm font-semibold text-white hover:bg-white/20"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="min-h-11 rounded-xl bg-amber-400 px-4 text-sm font-semibold text-stone-900 hover:bg-amber-300"
+        >
+          Save
+        </button>
+      </form>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>

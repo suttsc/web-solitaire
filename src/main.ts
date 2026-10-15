@@ -3,7 +3,8 @@ import '@fontsource/libre-bodoni/latin-700.css';
 import '@fontsource/oswald/latin-600.css';
 import './style.css';
 import { applyTheme } from './ui/cards/apply';
-import { getTheme, THEME_IDS, THEMES } from './ui/cards/themes';
+import { getTheme, THEMES, type ThemeId } from './ui/cards/themes';
+import { createThemeBar } from './ui/theme-bar';
 import { createController, initialState, type AppState } from './app/controller';
 import { currentScore, elapsed, hasStarted, type Session } from './app/session';
 import { createStore } from './app/store';
@@ -22,7 +23,6 @@ import {
   actionButton,
   el,
   showLeaderboard,
-  segmented,
   showStats,
   toggleRow,
 } from './ui/screens';
@@ -97,6 +97,18 @@ async function main(): Promise<void> {
     getTheme(settings.theme),
   );
   applyTheme(getTheme(settings.theme));
+
+  const showTheme = (id: ThemeId) => {
+    const theme = getTheme(id);
+    applyTheme(theme);
+    board.setTheme(theme);
+  };
+  const themeBar = createThemeBar(required('#theme-bar') as HTMLFormElement, required('nav'), {
+    preview: showTheme,
+    save: (theme) => {
+      controller.updateSettings({ theme });
+    },
+  });
 
   /** Play the remaining cards to the foundations one by one so the player sees them go. */
   function runAutoComplete(): void {
@@ -272,15 +284,11 @@ async function main(): Promise<void> {
       ),
     );
     const { settings: current } = store.get();
-    const themeLabel = el('p', 'text-sm font-medium text-white', 'Card style');
-    const themePicker = segmented(
-      THEME_IDS.map((id) => [id, THEMES[id].name] as const),
-      current.theme,
-      (theme) => {
-        controller.updateSettings({ theme });
-      },
-    );
-    body.append(themeLabel, themePicker);
+    const themeButton = actionButton(`Card style: ${THEMES[current.theme].name}`, () => {
+      themeButton.closest('dialog')?.close();
+      themeBar.open(store.get().settings.theme);
+    });
+    body.append(themeButton);
     body.append(
       toggleRow('Sound', 'Card and win sounds', current.sound, (sound) => {
         controller.updateSettings({ sound });
@@ -323,11 +331,7 @@ async function main(): Promise<void> {
     const { session } = state;
 
     if (state.settings !== previous.settings) void persistence.saveSettings(state.settings);
-    if (state.settings.theme !== previous.settings.theme) {
-      const theme = getTheme(state.settings.theme);
-      applyTheme(theme);
-      board.setTheme(theme);
-    }
+    if (state.settings.theme !== previous.settings.theme) showTheme(state.settings.theme);
     if (session !== previous.session) {
       void (session.status === 'won'
         ? db.current.clear()

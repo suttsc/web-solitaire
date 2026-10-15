@@ -9,7 +9,7 @@ Hono API on Cloudflare Workers backed by D1. The app and API ship as a single Wo
 - Games are saved locally (IndexedDB) after every move and resume after closing the app.
 - Finished games sync to D1 once you add a name; stats and leaderboards work across browsers.
 - Optional password protects your name; other browsers then sign in with it.
-- Four card themes, swappable in Settings: Classic (the original art), Heritage, Victorian and
+- Four card themes, previewed on the table before saving (Settings → Card style): Classic (the original art), Heritage, Victorian and
   Casino. Every theme uses a phone-friendly layout: big rank top left, suit top right, a large
   suit or court portrait below.
 - Extras: auto-complete, sounds, replay any past deal, Vegas scoring, and "winnable deals only"

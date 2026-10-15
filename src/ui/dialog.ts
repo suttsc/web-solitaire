@@ -21,7 +21,7 @@ const VARIANTS = {
 export function showDialog<T>(options: DialogOptions<T>): Promise<T> {
   const dialog = document.createElement('dialog');
   dialog.className =
-    'm-auto w-[min(92vw,26rem)] rounded-2xl bg-felt-dark p-0 text-white shadow-2xl backdrop:bg-black/60';
+    'm-auto w-[min(92vw,26rem)] rounded-2xl outline-none bg-felt-dark p-0 text-white shadow-2xl backdrop:bg-black/60';
 
   const panel = document.createElement('div');
   panel.className = 'space-y-4 p-5';
@@ -65,6 +65,10 @@ export function showDialog<T>(options: DialogOptions<T>): Promise<T> {
 
     document.body.append(dialog);
     dialog.showModal();
+    // showModal focuses the first field; move focus to the dialog itself so opening it never
+    // pops up the on-screen keyboard. Tab still reaches every control.
+    dialog.tabIndex = -1;
+    dialog.focus();
   });
 }
 
