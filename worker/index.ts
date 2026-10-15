@@ -135,7 +135,8 @@ app.get('/stats/global', zValidator('query', DrawQuerySchema), async (c) => {
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
 
 app.onError((error, c) => {
-  console.error(error);
+  // Log the message explicitly: D1 errors otherwise reach Workers Logs as a bare stack trace.
+  console.error(`${c.req.method} ${c.req.path} failed: ${error.message}`, error.cause ?? '');
   return c.json({ error: 'Internal error' }, 500);
 });
 

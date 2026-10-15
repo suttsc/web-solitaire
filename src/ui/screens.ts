@@ -406,7 +406,7 @@ export function accountSection(account: Account, actions: AccountActions): HTMLE
     if (!message.textContent) {
       message.textContent = state.name
         ? `Your games sync to ${state.name}.`
-        : 'Add a name to sync your games and join the leaderboard.';
+        : 'Add a name to sync your games and join the leaderboard. Once it’s saved, you can protect it with a password.';
     }
     section.append(message);
   }

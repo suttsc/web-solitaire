@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameRecord } from '../shared/schema';
 import app from './index';
 import { createTestD1 } from './test/d1';
@@ -198,5 +198,30 @@ describe('stats and leaderboards', () => {
     expect(body.stats).toMatchObject({ played: 3, won: 2, fewestMoves: 95 });
     expect((await request('/api/players/nobody/stats')).status).toBe(404);
     expect((await request('/api/players/nobody/games')).status).toBe(404);
+  });
+});
+
+describe('errors', () => {
+  it('logs the underlying database message and hides it from the client', async () => {
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const broken = {
+      DB: {
+        prepare: () => {
+          throw new Error('D1_ERROR: no such table: players: SQLITE_ERROR');
+        },
+      } as unknown as D1Database,
+    };
+    const res = await app.request(
+      '/api/players',
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"name":"Chris"}' },
+      broken,
+    );
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: 'Internal error' });
+    expect(spy).toHaveBeenCalledWith(
+      'POST /api/players failed: D1_ERROR: no such table: players: SQLITE_ERROR',
+      '',
+    );
+    spy.mockRestore();
   });
 });
