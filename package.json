@@ -18,7 +18,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "test:e2e": "playwright test",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.64.0",
@@ -26,9 +29,11 @@
     "@playwright/test": "^1.64.1",
     "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^22.20.5",
+    "@vite-pwa/assets-generator": "^2.0.0",
     "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.12.0",
     "eslint-config-prettier": "^10.1.8",
+    "fake-indexeddb": "^6.2.5",
     "fast-check": "^4.10.2",
     "globals": "^17.13.0",
     "prettier": "^3.9.10",
@@ -36,10 +41,15 @@
     "typescript": "~6.0.3",
     "typescript-eslint": "^8.71.2",
     "vite": "^8.3.4",
+    "vite-plugin-pwa": "^2.0.0",
     "vitest": "^5.0.5",
+    "workbox-window": "^7.4.1",
     "wrangler": "^4.151.0"
   },
   "dependencies": {
-    "hono": "^4.13.13"
+    "@hono/zod-validator": "^0.9.1",
+    "dexie": "^4.4.6",
+    "hono": "^4.13.13",
+    "zod": "^4.6.7"
   }
 }

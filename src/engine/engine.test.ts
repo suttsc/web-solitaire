@@ -15,6 +15,7 @@ import {
   newGame,
   play,
   randomSeed,
+  replay,
   shuffle,
   timePenalty,
   tryMove,
@@ -305,6 +306,7 @@ describe('game session and undo', () => {
       state: makeState({ waste: cards('AH') }),
       history: [],
       undos: 0,
+      log: [],
     };
     const played = play(start, { type: 'waste-to-foundation', foundation: 0 });
     expect(played?.state.score).toBe(10);
@@ -340,7 +342,7 @@ describe('game session and undo', () => {
         foundationUpTo('S', 13),
       ],
     });
-    expect(isGameWon({ state: won, history: [], undos: 0 })).toBe(true);
+    expect(isGameWon({ state: won, history: [], undos: 0, log: [] })).toBe(true);
     expect(isGameWon(newGame(1, 3))).toBe(false);
   });
 });
@@ -393,6 +395,32 @@ describe('properties', () => {
       ),
       { numRuns: 200 },
     );
+  });
+
+  it('replaying the action log rebuilds the same game', () => {
+    fc.assert(
+      fc.property(
+        fc.integer({ min: 0, max: 0xffffffff }),
+        fc.array(fc.nat(), { maxLength: 80 }),
+        (seed, picks) => {
+          let game = newGame(seed, 3);
+          for (const pick of picks) {
+            const moves = legalMoves(game.state);
+            const next =
+              pick % 5 === 0
+                ? undo(game)
+                : play(game, moves[pick % moves.length] ?? { type: 'draw' });
+            game = next ?? game;
+          }
+          expect(replay(seed, 3, game.log)).toEqual(game);
+        },
+      ),
+      { numRuns: 100 },
+    );
+  });
+
+  it('refuses a log that does not fit the deal', () => {
+    expect(() => replay(1, 3, [{ type: 'recycle' }])).toThrow();
   });
 
   it('undo restores the exact previous board after any move', () => {

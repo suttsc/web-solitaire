@@ -1,5 +1,6 @@
 import {
   foundationMoveFor,
+  isStuck,
   legalMoveBetween,
   randomSeed,
   samePile,
@@ -9,30 +10,54 @@ import {
   type PileRef,
   type Source,
 } from '../engine';
-import { pause, playMove, resume, startSession, undoMove, type Session } from './session';
+import type { GameResult } from '../../shared/schema';
+import { DEFAULT_SETTINGS, type Settings } from '../data/db';
+import {
+  hasStarted,
+  pause,
+  playMove,
+  resume,
+  startSession,
+  undoMove,
+  type Session,
+} from './session';
 import type { Store } from './store';
 
 export interface AppState {
   readonly session: Session;
   readonly selection: Source | null;
-  readonly drawMode: DrawMode;
+  readonly settings: Settings;
 }
 
 export type Clock = () => number;
 
-export function initialState(drawMode: DrawMode = 3, seed: number = randomSeed()): AppState {
-  return {
-    session: startSession(crypto.randomUUID(), seed, drawMode),
-    selection: null,
-    drawMode,
-  };
+export interface ControllerHooks {
+  /** Called once per game when it's won, or when it's left unfinished for a new deal. */
+  readonly finished?: (session: Session, result: GameResult, now: number) => void;
+}
+
+export function initialState(
+  settings: Settings = DEFAULT_SETTINGS,
+  session: Session = startSession(
+    crypto.randomUUID(),
+    randomSeed(),
+    settings.drawMode,
+    settings.scoringMode,
+  ),
+): AppState {
+  return { session, selection: null, settings };
 }
 
 /** Turns player intents (taps, drops, buttons) into session updates. */
-export function createController(store: Store<AppState>, now: Clock = Date.now) {
+export function createController(
+  store: Store<AppState>,
+  hooks: ControllerHooks = {},
+  now: Clock = Date.now,
+) {
   const update = (session: Session | null): boolean => {
     if (!session) return false;
     store.set({ session, selection: null });
+    if (session.status === 'won') hooks.finished?.(session, 'won', now());
     return true;
   };
 
@@ -100,12 +125,21 @@ export function createController(store: Store<AppState>, now: Clock = Date.now) 
       return update(undoMove(store.get().session, now()));
     },
 
-    newGame(drawMode: DrawMode): void {
+    /** Deal a new game, recording the current one as stuck or abandoned if it was started and not won. */
+    newGame(drawMode: DrawMode, seed: number = randomSeed()): void {
+      const { session, settings } = store.get();
+      if (hasStarted(session) && session.status !== 'won') {
+        hooks.finished?.(session, isStuck(session.game.state) ? 'stuck' : 'abandoned', now());
+      }
       store.set({
-        session: startSession(crypto.randomUUID(), randomSeed(), drawMode),
+        session: startSession(crypto.randomUUID(), seed, drawMode, settings.scoringMode),
         selection: null,
-        drawMode,
+        settings: { ...settings, drawMode },
       });
+    },
+
+    updateSettings(changes: Partial<Settings>): void {
+      store.set(({ settings }) => ({ settings: { ...settings, ...changes } }));
     },
 
     pause(): void {

@@ -3,3 +3,7 @@ dist
 package-lock.json
 worker-configuration.d.ts
 coverage
+test-results
+playwright-report
+public/cards
+dev-dist
