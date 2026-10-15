@@ -5,12 +5,12 @@ Hono API on Cloudflare Workers backed by D1. The app and API ship as a single Wo
 
 - Draw 3 (main) and draw 1, Windows-style standard scoring, timer from the first move that pauses
   whenever the app loses focus, move counter, unlimited undo (counts as a move, restores the score).
-- No hints. Redealing mid-game warns if useful moves remain; a stuck game offers undo or a new deal.
+- No hints. Redealing mid-game warns if useful moves remain; nothing interrupts play otherwise.
 - Games are saved locally (IndexedDB) after every move and resume after closing the app.
 - Finished games sync to D1 once you add a name; stats and leaderboards work across browsers.
 - Optional password protects your name; other browsers then sign in with it.
-- Four card themes, previewed on the table before saving (Settings → Card style): Classic (the original art), Heritage, Victorian and
-  Casino. Every theme uses a phone-friendly layout: big rank top left, suit top right, a large
+- Five card themes, previewed on the table before saving (Settings → Card style): Classic (the
+  original art), Heritage, Victorian, Casino and Neon. Every theme uses a phone-friendly layout: big rank top left, suit top right, a large
   suit or court portrait below.
 - Extras: auto-complete, sounds, replay any past deal, Vegas scoring, and "winnable deals only"
   (a solver in a Web Worker proves each deal can be won before dealing it).

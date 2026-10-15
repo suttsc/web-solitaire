@@ -3,7 +3,7 @@ import type { Card } from '../../engine';
 import { courtFigure } from './figures';
 import { isRedSuit, suitMark } from './suits';
 
-export const THEME_IDS = ['classic', 'heritage', 'victorian', 'casino'] as const;
+export const THEME_IDS = ['classic', 'heritage', 'victorian', 'casino', 'neon'] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 export interface Palette {
@@ -30,13 +30,17 @@ export interface Theme {
   readonly fontFamily: string;
   readonly fontWeight: number;
   readonly rankSize: number;
+  /** Font for the number ranks 2–10 when it differs, e.g. lining figures beside an old-style face. */
+  readonly numberFont?: { readonly family: string; readonly weight: number; readonly size: number };
   readonly palette: Palette;
   /** Table felt: centre highlight, base and edge. */
   readonly felt: { readonly light: string; readonly base: string; readonly dark: string };
-  readonly ace: 'ring' | 'rings' | 'gilt' | 'plain';
-  readonly frame: 'single' | 'gilt';
+  readonly ace: 'ring' | 'rings' | 'gilt' | 'plain' | 'neon';
+  readonly frame: 'single' | 'gilt' | 'neon';
+  /** Draw suits and ranks with a soft glow (Neon). */
+  readonly glow: boolean;
   /** Courts use the original deck's artwork (Classic) or the stylised portraits. */
-  readonly courts: 'original' | 'figures';
+  readonly courts: 'original' | 'figures' | 'monogram';
   readonly back: () => string;
 }
 
@@ -104,13 +108,24 @@ function casinoBack(): string {
 <rect x="14" y="14" width="122" height="182" rx="4" fill="none" stroke="#fff" stroke-width="1.5"/>`);
 }
 
+function neonBack(): string {
+  return svgDoc(`<defs><pattern id="g" width="12" height="12" patternUnits="userSpaceOnUse"><path d="M12 0H0V12" fill="none" stroke="#3FE0FF" stroke-width=".6" opacity=".35"/></pattern></defs>
+<rect x="0.5" y="0.5" width="149" height="209" rx="10" fill="#0E0F14" stroke="#2C2F3D"/>
+<rect x="8" y="8" width="134" height="194" rx="6" fill="url(#g)"/>
+<rect x="12" y="12" width="126" height="186" rx="5" fill="none" stroke="#3FE0FF" stroke-width="6" opacity=".18"/>
+<rect x="12" y="12" width="126" height="186" rx="5" fill="none" stroke="#3FE0FF" stroke-width="1.6"/>
+<path d="M75 70 L105 105 L75 140 L45 105 Z" fill="none" stroke="#FF4D8D" stroke-width="8" opacity=".25" stroke-linejoin="round"/>
+<path d="M75 70 L105 105 L75 140 L45 105 Z" fill="#0E0F14" stroke="#FF4D8D" stroke-width="2.2" stroke-linejoin="round"/>
+<path d="M75 88 L90 105 L75 122 L60 105 Z" fill="none" stroke="#FFD23D" stroke-width="1.6" stroke-linejoin="round"/>`);
+}
+
 export const THEMES: Record<ThemeId, Theme> = {
   classic: {
     id: 'classic',
     name: 'Classic',
     fontFamily: "Georgia, 'Times New Roman', serif",
     fontWeight: 700,
-    rankSize: 48,
+    rankSize: 64,
     palette: {
       stock: '#FFFFFF',
       edge: '#9A9A9A',
@@ -123,6 +138,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     },
     felt: { light: '#2A8A4C', base: '#1D6B3A', dark: '#0F3D22' },
     ace: 'ring',
+    glow: false,
     frame: 'single',
     courts: 'original',
     back: () => '',
@@ -132,7 +148,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     name: 'Heritage',
     fontFamily: "'Libre Bodoni', Georgia, serif",
     fontWeight: 700,
-    rankSize: 48,
+    rankSize: 64,
     palette: {
       stock: '#FFFFFF',
       edge: '#CFCBC2',
@@ -145,6 +161,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     },
     felt: { light: '#2A8A4C', base: '#1D6B3A', dark: '#0F3D22' },
     ace: 'rings',
+    glow: false,
     frame: 'single',
     courts: 'figures',
     back: heritageBack,
@@ -154,7 +171,9 @@ export const THEMES: Record<ThemeId, Theme> = {
     name: 'Victorian',
     fontFamily: "'IM Fell English SC', Georgia, serif",
     fontWeight: 400,
-    rankSize: 52,
+    rankSize: 70,
+    // IM Fell only has old-style figures, which sit small and make "10" read like "IO".
+    numberFont: { family: "'Libre Bodoni', Georgia, serif", weight: 700, size: 64 },
     palette: {
       stock: '#F5EEDC',
       edge: '#C9B48C',
@@ -171,6 +190,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     },
     felt: { light: '#2C6446', base: '#1F4A33', dark: '#102A1D' },
     ace: 'gilt',
+    glow: false,
     frame: 'gilt',
     courts: 'figures',
     back: victorianBack,
@@ -180,7 +200,7 @@ export const THEMES: Record<ThemeId, Theme> = {
     name: 'Casino',
     fontFamily: "'Oswald', 'Arial Narrow', sans-serif",
     fontWeight: 600,
-    rankSize: 52,
+    rankSize: 68,
     palette: {
       stock: '#FFFFFF',
       edge: '#CFCBC2',
@@ -194,9 +214,34 @@ export const THEMES: Record<ThemeId, Theme> = {
     },
     felt: { light: '#2A8A4C', base: '#1D6B3A', dark: '#0F3D22' },
     ace: 'plain',
+    glow: false,
     frame: 'single',
     courts: 'figures',
     back: casinoBack,
+  },
+  neon: {
+    id: 'neon',
+    name: 'Neon',
+    fontFamily: "'Oswald', 'Arial Narrow', sans-serif",
+    fontWeight: 600,
+    rankSize: 68,
+    palette: {
+      stock: '#14151C',
+      edge: '#2C2F3D',
+      // Pink and cyan stand in for red and black, and differ in lightness as well as hue.
+      red: '#FF4D8D',
+      black: '#3FE0FF',
+      ink: '#E8E9F0',
+      ...ENGLISH,
+      field: '#1B1D27',
+      accent: '#FFD23D',
+    },
+    felt: { light: '#3A2C6E', base: '#211845', dark: '#0E0A1F' },
+    ace: 'neon',
+    frame: 'neon',
+    glow: true,
+    courts: 'monogram',
+    back: neonBack,
   },
 };
 
@@ -207,36 +252,68 @@ export const getTheme = (id: string): Theme =>
 
 const RANK_TEXT = ['', 'A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 
+/** Corner geometry: the rank's baseline and the top-right suit. Everything above y≈64 is the strip a column leaves visible. */
+const RANK_BASELINE = 62;
+const CORNER_SUIT = { x: 98, y: 10, size: 44 } as const;
+
 /** Court picture frame (also used for the classic art crop). */
-const FRAME = { x: 12, y: 60, w: 126, h: 140 } as const;
+const FRAME = { x: 12, y: 78, w: 126, h: 122 } as const;
+
+/** A suit symbol, with a soft halo underneath on glowing themes. */
+function mark(theme: Theme, suit: Card['suit'], x: number, y: number, size: number, fill: string) {
+  if (!theme.glow) return suitMark(suit, x, y, size, fill);
+  const halo = suitMark(suit, x, y, size, fill).replace(
+    `fill="${fill}">`,
+    `fill="${fill}" stroke="${fill}" stroke-width="12" stroke-linejoin="round" opacity=".25">`,
+  );
+  return halo + suitMark(suit, x, y, size, fill);
+}
+
+const glowStroke = (d: string, color: string, width: number) =>
+  `<path d="${d}" fill="none" stroke="${color}" stroke-width="${width * 4}" stroke-linejoin="round" opacity=".22"/><path d="${d}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linejoin="round"/>`;
+
+function star(cx: number, cy: number, outer: number, inner: number): string {
+  const points = Array.from({ length: 10 }, (_, i) => {
+    const r = i % 2 === 0 ? outer : inner;
+    const angle = (Math.PI / 5) * i - Math.PI / 2;
+    return `${(cx + r * Math.cos(angle)).toFixed(1)} ${(cy + r * Math.sin(angle)).toFixed(1)}`;
+  });
+  return `M${points.join(' L')} Z`;
+}
+
+const EMBLEMS: Record<11 | 12 | 13, string> = {
+  13: 'M55 110 L55 92 L64 100 L75 84 L86 100 L95 92 L95 110 Z',
+  12: 'M55 110 Q55 96 65 98 Q70 85 75 85 Q80 85 85 98 Q95 96 95 110 Z',
+  11: star(75, 97, 14, 6),
+};
 
 function aceBody(theme: Theme, card: Card, color: string): string {
   const p = theme.palette;
   const cx = 75;
-  const cy = 132;
+  const cy = 142;
   const ring = (r: number, stroke: string, width: number) =>
     `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${stroke}" stroke-width="${width}"/>`;
-  const compass = (mark: (x: number, y: number) => string) =>
+  const compass = (draw: (x: number, y: number) => string) =>
     [
       [cx, cy - 54],
       [cx, cy + 54],
       [cx - 54, cy],
       [cx + 54, cy],
     ]
-      .map(([x, y]) => mark(x ?? 0, y ?? 0))
+      .map(([x, y]) => draw(x ?? 0, y ?? 0))
       .join('');
 
   switch (theme.ace) {
     case 'plain':
-      return suitMark(card.suit, 20, 78, 110, color);
+      return suitMark(card.suit, 23, 92, 104, color);
     case 'ring':
-      return ring(52, p.black, 1) + suitMark(card.suit, 37, 94, 76, color);
+      return ring(52, p.black, 1) + suitMark(card.suit, 39, 106, 72, color);
     case 'rings':
       return (
         ring(54, p.black, 1.2) +
         ring(50, p.black, 1.2) +
         compass((x, y) => suitMark('D', x - 4, y - 4, 8, p.black)) +
-        suitMark(card.suit, 38, 95, 74, color)
+        suitMark(card.suit, 40, 107, 70, color)
       );
     case 'gilt':
       return (
@@ -244,27 +321,54 @@ function aceBody(theme: Theme, card: Card, color: string): string {
         ring(51, p.ink, 0.6) +
         ring(48, p.ink, 0.6) +
         compass((x, y) => suitMark(card.suit, x - 5, y - 5, 10, p.accent)) +
-        suitMark(card.suit, 40, 97, 70, color) +
-        suitMark(card.suit, 63, 120, 24, p.accent)
+        suitMark(card.suit, 42, 109, 66, color) +
+        suitMark(card.suit, 64, 131, 22, p.accent)
+      );
+    case 'neon':
+      return (
+        `<circle cx="${cx}" cy="${cy}" r="52" fill="none" stroke="${p.accent}" stroke-width="6" opacity=".2"/>` +
+        ring(52, p.accent, 1.5) +
+        mark(theme, card.suit, 37, 104, 76, color)
       );
   }
 }
 
-function courtBody(theme: Theme, card: Card & { rank: 11 | 12 | 13 }): string {
+function courtBody(theme: Theme, card: Card & { rank: 11 | 12 | 13 }, color: string): string {
   const p = theme.palette;
   const { x, y, w, h } = FRAME;
   const field = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="${p.field}"/>`;
-  const art =
-    theme.courts === 'original'
-      ? // The upper half of the original double-ended court artwork, cropped into the frame.
-        `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="-82 -130 165 140" preserveAspectRatio="xMidYMid slice"><image href="/cards/${cardKey(card)}.svg" x="-120" y="-168" width="240" height="336"/></svg>`
-      : // A nested viewport clips the portrait to the frame without needing a clipPath id.
-        `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}"><g transform="translate(-37.5 42.5) scale(1.5)">${courtFigure(card.rank, p)}</g></svg>`;
-  const frame =
-    theme.frame === 'gilt'
-      ? `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="none" stroke="${p.accent}" stroke-width="1.4"/>
-<rect x="${x + 3.5}" y="${y + 3.5}" width="${w - 7}" height="${h - 7}" rx="3" fill="none" stroke="${p.ink}" stroke-width=".6"/>`
-      : `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="${p.ink}" stroke-width="1.2"/>`;
+  let art: string;
+  switch (theme.courts) {
+    case 'original':
+      // The upper half of the original double-ended court artwork, cropped into the frame.
+      art = `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="-82 -130 165 140" preserveAspectRatio="xMidYMid slice"><image href="/cards/${cardKey(card)}.svg" x="-120" y="-168" width="240" height="336"/></svg>`;
+      break;
+    case 'figures':
+      // A nested viewport clips the portrait to the frame without needing a clipPath id.
+      art = `<svg x="${x}" y="${y}" width="${w}" height="${h}" viewBox="${x} ${y} ${w} ${h}"><g transform="translate(-37.5 42.5) scale(1.5)">${courtFigure(card.rank, p)}</g></svg>`;
+      break;
+    case 'monogram': {
+      // A big outlined letter under a crown, tiara or star, all in glowing strokes.
+      const letter = RANK_TEXT[card.rank] ?? '';
+      const text = (stroke: number, opacity: number) =>
+        `<text x="75" y="190" text-anchor="middle" fill="none" stroke="${color}" stroke-width="${stroke}" stroke-linejoin="round" opacity="${opacity}" font-family="${theme.fontFamily.replaceAll('"', "'")}" font-weight="${theme.fontWeight}" font-size="86">${letter}</text>`;
+      art = glowStroke(EMBLEMS[card.rank], p.accent, 2) + text(9, 0.22) + text(2.4, 1);
+      break;
+    }
+  }
+  let frame: string;
+  switch (theme.frame) {
+    case 'gilt':
+      frame = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="4" fill="none" stroke="${p.accent}" stroke-width="1.4"/>
+<rect x="${x + 3.5}" y="${y + 3.5}" width="${w - 7}" height="${h - 7}" rx="3" fill="none" stroke="${p.ink}" stroke-width=".6"/>`;
+      break;
+    case 'neon':
+      frame = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="${color}" stroke-width="1.2" opacity=".55"/>`;
+      break;
+    case 'single':
+      frame = `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="6" fill="none" stroke="${p.ink}" stroke-width="1.2"/>`;
+      break;
+  }
   return `${field}${art}${frame}`;
 }
 
@@ -272,19 +376,28 @@ const isCourt = (card: Card): card is Card & { rank: 11 | 12 | 13 } => card.rank
 
 /**
  * Inline SVG for a face-up card: big rank top left, suit top right, and a large suit or a
- * court portrait filling the rest, so the card reads at phone size and from the top strip
+ * court picture filling the rest, so the card reads at phone size and from the top strip
  * left visible in a tableau column.
  */
 export function renderFace(theme: Theme, card: Card): string {
   const p = theme.palette;
   const color = isRedSuit(card.suit) ? p.red : p.black;
-  const rank = `<text x="10" y="48" fill="${color}" font-family="${theme.fontFamily.replaceAll('"', "'")}" font-weight="${theme.fontWeight}" font-size="${theme.rankSize}">${RANK_TEXT[card.rank] ?? ''}</text>`;
-  const corner = suitMark(card.suit, 104, 10, 36, color);
+  const typeface =
+    card.rank >= 2 && card.rank <= 10 && theme.numberFont
+      ? theme.numberFont
+      : { family: theme.fontFamily, weight: theme.fontWeight, size: theme.rankSize };
+  const font = `font-family="${typeface.family.replaceAll('"', "'")}" font-weight="${typeface.weight}" font-size="${typeface.size}"`;
+  const label = RANK_TEXT[card.rank] ?? '';
+  const halo = theme.glow
+    ? `<text x="8" y="${RANK_BASELINE}" fill="${color}" stroke="${color}" stroke-width="8" stroke-linejoin="round" opacity=".22" ${font}>${label}</text>`
+    : '';
+  const rank = `${halo}<text x="8" y="${RANK_BASELINE}" fill="${color}" ${font}>${label}</text>`;
+  const corner = mark(theme, card.suit, CORNER_SUIT.x, CORNER_SUIT.y, CORNER_SUIT.size, color);
   const body = isCourt(card)
-    ? courtBody(theme, card)
+    ? courtBody(theme, card, color)
     : card.rank === 1
       ? aceBody(theme, card, color)
-      : suitMark(card.suit, 27, 88, 96, color);
+      : mark(theme, card.suit, 31, 100, 88, color);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="100%" height="100%" preserveAspectRatio="none" aria-hidden="true">${stockRect(p)}${rank}${corner}${body}</svg>`;
 }

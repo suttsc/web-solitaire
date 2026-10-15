@@ -78,7 +78,7 @@ export function computeLayout(state: GameState, width: number, height: number): 
 
   const wasteX = columnX(TABLEAU_COUNT - 3);
   // Wide enough to show a fanned card's corner rank, even a "10".
-  const fanStep = cardW * 0.4;
+  const fanStep = cardW * 0.52;
   slots.push({ pile: { kind: 'waste' }, rect: rect(wasteX, topY) });
   const fanned = state.drawMode === 3 ? WASTE_FAN : 1;
   const fanStart = Math.max(0, state.waste.length - fanned);
@@ -96,13 +96,13 @@ export function computeLayout(state: GameState, width: number, height: number): 
     const faceDown = pile.filter((card) => !card.faceUp).length;
     const faceUpGaps = Math.max(0, pile.length - faceDown - 1);
     const downStep = cardH * 0.1;
-    // Face-up cards show at least their top 24%: the corner rank and suit live there.
-    const idealUpStep = cardH * 0.28;
+    // Face-up cards show at least their top 30%: the corner rank and suit live there.
+    const idealUpStep = cardH * 0.33;
     const upStep =
       faceUpGaps === 0
         ? idealUpStep
         : Math.max(
-            cardH * 0.24,
+            cardH * 0.3,
             Math.min(idealUpStep, (available - faceDown * downStep) / faceUpGaps),
           );
 

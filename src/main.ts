@@ -12,7 +12,7 @@ import { createApi } from './data/api';
 import { SolitaireDb } from './data/db';
 import { createPersistence, toGameRecord } from './data/persistence';
 import { createSync } from './data/sync';
-import { canAutoComplete, hasUsefulMoves, isStuck, type DrawMode } from './engine';
+import { canAutoComplete, hasUsefulMoves, type DrawMode } from './engine';
 import { canInstall, install, registerServiceWorker, requestPersistentStorage } from './pwa';
 import { createBoard, preloadCards } from './ui/board';
 import { showDialog, statList } from './ui/dialog';
@@ -202,21 +202,6 @@ async function main(): Promise<void> {
     if (choice !== null) await newGame(choice);
   }
 
-  async function offerWayOut(): Promise<void> {
-    const choice = await showDialog<'undo' | 'new' | null>({
-      title: 'No moves left',
-      body: 'Nothing useful can be played on the board or from the stock.',
-      actions: [
-        { label: 'Close', value: null },
-        { label: 'Undo', value: 'undo' },
-        { label: 'New game', value: 'new', variant: 'primary' },
-      ],
-      dismissValue: null,
-    });
-    if (choice === 'undo') controller.undo();
-    if (choice === 'new') await newGame(store.get().settings.drawMode);
-  }
-
   async function celebrate(session: Session): Promise<void> {
     const now = Date.now();
     const again = await showDialog({
@@ -343,15 +328,7 @@ async function main(): Promise<void> {
       else if (session.game.state.moves > previous.session.game.state.moves) sounds.place();
     }
 
-    if (session.status === 'won' && previous.session.status !== 'won') {
-      void celebrate(session);
-    } else if (
-      session.status === 'playing' &&
-      session.game.state !== previous.session.game.state &&
-      isStuck(session.game.state)
-    ) {
-      void offerWayOut();
-    }
+    if (session.status === 'won' && previous.session.status !== 'won') void celebrate(session);
   });
 
   // The clock pauses whenever the app loses focus, behind an overlay so the board can't be studied for free.
