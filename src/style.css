@@ -1,6 +1,29 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-felt: #14532d;
+  --color-felt: #1d6b3a;
   --color-felt-dark: #0f3d22;
+}
+
+@layer base {
+  body {
+    background-image: radial-gradient(
+      ellipse at 50% 30%,
+      #2a8a4c 0%,
+      var(--color-felt) 55%,
+      var(--color-felt-dark) 100%
+    );
+  }
+}
+
+@layer components {
+  .toolbar-button {
+    @apply flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl text-[0.7rem] font-medium text-white/90 transition hover:bg-white/10 active:bg-white/20 disabled:opacity-40;
+
+    & svg {
+      @apply size-6 fill-none stroke-current stroke-2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  }
 }

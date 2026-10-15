@@ -49,3 +49,9 @@ export const allCards = (state: GameState): Card[] => [
   ...state.foundations.flat(),
   ...state.tableau.flat(),
 ];
+
+/** Narrow away null/undefined in tests, failing loudly instead of asserting with `!`. */
+export function defined<T>(value: T | null | undefined): T {
+  if (value === null || value === undefined) throw new Error('Expected a value');
+  return value;
+}
