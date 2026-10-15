@@ -3,13 +3,14 @@
 @theme {
   --color-felt: #1d6b3a;
   --color-felt-dark: #0f3d22;
+  --color-felt-light: #2a8a4c;
 }
 
 @layer base {
   body {
     background-image: radial-gradient(
       ellipse at 50% 30%,
-      #2a8a4c 0%,
+      var(--color-felt-light) 0%,
       var(--color-felt) 55%,
       var(--color-felt-dark) 100%
     );

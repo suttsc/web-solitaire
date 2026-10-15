@@ -7,6 +7,7 @@ import {
   type PileRef,
   type Source,
 } from '../engine';
+import { backImage, renderFace, type Theme } from './cards/themes';
 import { cardKey, computeLayout, dropTarget, type Layout } from './layout';
 
 export interface BoardHandlers {
@@ -63,16 +64,16 @@ const SUIT_NAMES = { C: 'clubs', D: 'diamonds', H: 'hearts', S: 'spades' } as co
 export const cardLabel = (card: Card): string =>
   card.faceUp ? `${RANK_NAMES[card.rank] ?? ''} of ${SUIT_NAMES[card.suit]}` : 'face-down card';
 
-const cardImage = (card: Card): string => `url(/cards/${card.faceUp ? cardKey(card) : 'back'}.svg)`;
-
 const translate = ({ x, y }: Point): string => `translate(${x}px, ${y}px)`;
 
 const prefersReducedMotion = (): boolean =>
   window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-/** Preload card art so faces never flash blank on first flip. */
+/** Preload the original deck's back and court art (used by the Classic theme). */
 export function preloadCards(): void {
-  for (const card of createDeck()) new Image().src = `/cards/${cardKey(card)}.svg`;
+  for (const card of createDeck()) {
+    if (card.rank >= 11) new Image().src = `/cards/${cardKey(card)}.svg`;
+  }
   new Image().src = '/cards/back.svg';
 }
 
@@ -80,7 +81,10 @@ export function preloadCards(): void {
  * Renders the table into `root` with one persistent element per card, so moves can be
  * animated (FLIP via the Web Animations API) and dragged with Pointer Events.
  */
-export function createBoard(root: HTMLElement, handlers: BoardHandlers) {
+export function createBoard(root: HTMLElement, handlers: BoardHandlers, initialTheme: Theme) {
+  let theme = initialTheme;
+  let back = backImage(theme);
+  const faceCache = new Map<string, string>();
   const cardEls = new Map<string, HTMLElement>();
   const slotEls: HTMLElement[] = [];
   const visual = new Map<string, Point>();
@@ -95,7 +99,7 @@ export function createBoard(root: HTMLElement, handlers: BoardHandlers) {
     el.dataset.key = cardKey(card);
     el.setAttribute('role', 'button');
     el.className =
-      'absolute left-0 top-0 rounded-[7%] bg-white bg-[length:100%_100%] shadow-[0_1px_2px_rgb(0_0_0/0.45)] will-change-transform data-[selected]:outline-3 data-[selected]:outline-amber-300 data-[dragging]:shadow-[0_8px_18px_rgb(0_0_0/0.45)] focus-visible:outline-3 focus-visible:outline-sky-300';
+      'absolute left-0 top-0 rounded-[7%] bg-[length:100%_100%] shadow-[0_1px_2px_rgb(0_0_0/0.45)] will-change-transform data-[selected]:outline-3 data-[selected]:outline-amber-300 data-[dragging]:shadow-[0_8px_18px_rgb(0_0_0/0.45)] focus-visible:outline-3 focus-visible:outline-sky-300';
     cardEls.set(cardKey(card), el);
     root.append(el);
   }
@@ -118,6 +122,25 @@ export function createBoard(root: HTMLElement, handlers: BoardHandlers) {
       (a, b) => (layout?.cards.get(a.key)?.index ?? 0) - (layout?.cards.get(b.key)?.index ?? 0),
     );
   };
+
+  /** Draw a card's face (inline SVG, so the theme's fonts apply) or its back, only when it changed. */
+  function paint(el: HTMLElement, card: Card): void {
+    const art = card.faceUp ? `${theme.id}:${cardKey(card)}` : `${theme.id}:back`;
+    if (el.dataset.art === art) return;
+    el.dataset.art = art;
+    if (card.faceUp) {
+      let svg = faceCache.get(art);
+      if (!svg) {
+        svg = renderFace(theme, card);
+        faceCache.set(art, svg);
+      }
+      el.innerHTML = svg;
+      el.style.backgroundImage = 'none';
+    } else {
+      el.innerHTML = '';
+      el.style.backgroundImage = back;
+    }
+  }
 
   function renderSlots(current: Layout): void {
     current.slots.forEach((slot, i) => {
@@ -188,7 +211,7 @@ export function createBoard(root: HTMLElement, handlers: BoardHandlers) {
 
       el.style.width = `${current.cardW}px`;
       el.style.height = `${current.cardH}px`;
-      el.style.backgroundImage = cardImage(card);
+      paint(el, card);
       el.style.transform = translate(to);
       el.style.zIndex = String(placement.z);
       el.setAttribute('aria-label', cardLabel(card));
@@ -310,7 +333,16 @@ export function createBoard(root: HTMLElement, handlers: BoardHandlers) {
     if (view) render(view, false);
   }).observe(root);
 
-  return { render };
+  /** Swap the card art. Every card is repainted on the next render. */
+  function setTheme(next: Theme): void {
+    theme = next;
+    back = backImage(next);
+    faceCache.clear();
+    for (const el of cardEls.values()) delete el.dataset.art;
+    rerender();
+  }
+
+  return { render, setTheme };
 }
 
 export type Board = ReturnType<typeof createBoard>;

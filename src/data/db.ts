@@ -2,6 +2,7 @@ import { Dexie, type EntityTable } from 'dexie';
 import type { GameRecord, ScoringMode } from '../../shared/schema';
 import type { DrawMode, GameAction } from '../engine';
 import type { SessionStatus } from '../app/session';
+import { DEFAULT_THEME, type ThemeId } from '../ui/cards/themes';
 
 /** A finished game as stored on this device. `syncedAt` is null until the server has it. */
 export interface LocalGame extends GameRecord {
@@ -26,6 +27,7 @@ export interface Settings {
   readonly scoringMode: ScoringMode;
   readonly sound: boolean;
   readonly winnableOnly: boolean;
+  readonly theme: ThemeId;
   readonly playerId: string | null;
   readonly playerName: string | null;
   /** Session token after setting or entering a password; null for an unprotected name. */
@@ -37,6 +39,7 @@ export const DEFAULT_SETTINGS: Settings = {
   scoringMode: 'standard',
   sound: true,
   winnableOnly: false,
+  theme: DEFAULT_THEME,
   playerId: null,
   playerName: null,
   authToken: null,

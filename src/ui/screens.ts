@@ -36,6 +36,8 @@ export function segmented<T extends string | number>(
     button.setAttribute('role', 'radio');
     button.setAttribute('aria-checked', String(option === value));
     button.addEventListener('click', () => {
+      for (const other of group.children)
+        other.setAttribute('aria-checked', String(other === button));
       onChange(option);
     });
     group.append(button);

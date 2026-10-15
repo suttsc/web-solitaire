@@ -1,4 +1,9 @@
+import '@fontsource/im-fell-english-sc/latin-400.css';
+import '@fontsource/libre-bodoni/latin-700.css';
+import '@fontsource/oswald/latin-600.css';
 import './style.css';
+import { applyTheme } from './ui/cards/apply';
+import { getTheme, THEME_IDS, THEMES } from './ui/cards/themes';
 import { createController, initialState, type AppState } from './app/controller';
 import { currentScore, elapsed, hasStarted, type Session } from './app/session';
 import { createStore } from './app/store';
@@ -17,6 +22,7 @@ import {
   actionButton,
   el,
   showLeaderboard,
+  segmented,
   showStats,
   toggleRow,
 } from './ui/screens';
@@ -77,15 +83,20 @@ async function main(): Promise<void> {
   preloadCards();
   const autoCompleteButton = required('#autocomplete') as HTMLButtonElement;
   const soundOn = () => store.get().settings.sound;
-  const board = createBoard(boardEl, {
-    tapStock: () => controller.tapStock(),
-    tapCard: (pile, index) => controller.tapCard(pile, index),
-    tapSlot: (pile) => controller.tapSlot(pile),
-    doubleTapCard: (pile, index) => controller.doubleTapCard(pile, index),
-    drop(source, target) {
-      if (!controller.drop(source, target) && target && soundOn()) sounds.invalid();
+  const board = createBoard(
+    boardEl,
+    {
+      tapStock: () => controller.tapStock(),
+      tapCard: (pile, index) => controller.tapCard(pile, index),
+      tapSlot: (pile) => controller.tapSlot(pile),
+      doubleTapCard: (pile, index) => controller.doubleTapCard(pile, index),
+      drop(source, target) {
+        if (!controller.drop(source, target) && target && soundOn()) sounds.invalid();
+      },
     },
-  });
+    getTheme(settings.theme),
+  );
+  applyTheme(getTheme(settings.theme));
 
   /** Play the remaining cards to the foundations one by one so the player sees them go. */
   function runAutoComplete(): void {
@@ -261,6 +272,15 @@ async function main(): Promise<void> {
       ),
     );
     const { settings: current } = store.get();
+    const themeLabel = el('p', 'text-sm font-medium text-white', 'Card style');
+    const themePicker = segmented(
+      THEME_IDS.map((id) => [id, THEMES[id].name] as const),
+      current.theme,
+      (theme) => {
+        controller.updateSettings({ theme });
+      },
+    );
+    body.append(themeLabel, themePicker);
     body.append(
       toggleRow('Sound', 'Card and win sounds', current.sound, (sound) => {
         controller.updateSettings({ sound });
@@ -303,6 +323,11 @@ async function main(): Promise<void> {
     const { session } = state;
 
     if (state.settings !== previous.settings) void persistence.saveSettings(state.settings);
+    if (state.settings.theme !== previous.settings.theme) {
+      const theme = getTheme(state.settings.theme);
+      applyTheme(theme);
+      board.setTheme(theme);
+    }
     if (session !== previous.session) {
       void (session.status === 'won'
         ? db.current.clear()
