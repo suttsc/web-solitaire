@@ -8,6 +8,9 @@ import { createThemeBar } from './ui/theme-bar';
 import { createController, initialState, type AppState } from './app/controller';
 import { currentScore, elapsed, hasStarted, type Session } from './app/session';
 import { createStore } from './app/store';
+import type { RecordsResponse } from '../shared/schema';
+import { computeStats } from '../shared/stats';
+import { compareWin } from './app/records';
 import { createApi } from './data/api';
 import { SolitaireDb } from './data/db';
 import { createPersistence, toGameRecord } from './data/persistence';
@@ -15,7 +18,7 @@ import { createSync } from './data/sync';
 import { canAutoComplete, hasUsefulMoves, type DrawMode } from './engine';
 import { canInstall, install, registerServiceWorker, requestPersistentStorage } from './pwa';
 import { createBoard, preloadCards } from './ui/board';
-import { showDialog, statList } from './ui/dialog';
+import { showDialog } from './ui/dialog';
 import { formatDuration, formatNumber } from './ui/format';
 import { sounds } from './ui/sound';
 import {
@@ -25,6 +28,7 @@ import {
   showLeaderboard,
   showStats,
   toggleRow,
+  winSummary,
 } from './ui/screens';
 import { findWinnableDeal } from './winnable';
 
@@ -202,22 +206,39 @@ async function main(): Promise<void> {
     if (choice !== null) await newGame(choice);
   }
 
+  /** Win dialog: this game against your previous best and the best on record. */
   async function celebrate(session: Session): Promise<void> {
-    const now = Date.now();
+    const game = toGameRecord(session, 'won', Date.now(), __APP_VERSION__);
+    const { drawMode } = session.game.state;
+    const summary = el('div');
+    const previous = computeStats(
+      (await persistence.allGames()).filter((g) => g.id !== game.id),
+      drawMode,
+      game.scoringMode,
+    );
+    const show = (records: RecordsResponse | null, state: 'loading' | 'ready' | 'offline') => {
+      summary.replaceChildren(winSummary(compareWin(game, previous, records), state));
+    };
+    show(null, 'loading');
+    api.records(drawMode, game.id).then(
+      (records) => {
+        show(records, 'ready');
+      },
+      () => {
+        show(null, 'offline');
+      },
+    );
+
     const again = await showDialog({
       title: 'You won!',
-      body: statList([
-        ['Time', formatDuration(elapsed(session, now))],
-        ['Moves', formatNumber(session.game.state.moves)],
-        ['Score', formatNumber(currentScore(session, now))],
-      ]),
+      body: summary,
       actions: [
         { label: 'Close', value: false },
         { label: 'New game', value: true, variant: 'primary' },
       ],
       dismissValue: false,
     });
-    if (again) await newGame(session.game.state.drawMode);
+    if (again) await newGame(drawMode);
     else await offerUpdate();
   }
 

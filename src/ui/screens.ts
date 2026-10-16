@@ -4,6 +4,7 @@ import { ApiError } from '../data/api';
 import { computeStats } from '../../shared/stats';
 import type { Api } from '../data/api';
 import type { LocalGame } from '../data/db';
+import type { Metric, MetricComparison } from '../app/records';
 import { showDialog, statList } from './dialog';
 import { formatDuration, formatNumber } from './format';
 
@@ -329,6 +330,84 @@ export function accountSection(account: Account, actions: AccountActions): HTMLE
     return node;
   }
 
+  /** Swap in a form and focus its field: only ever on a tap, never when Settings opens. */
+  function showForm(node: HTMLElement, input: HTMLInputElement): void {
+    section.replaceChildren(node, message);
+    input.focus();
+  }
+
+  const row = (text: string, ...buttons: HTMLButtonElement[]) => {
+    const line = el('div', 'flex flex-wrap items-center justify-between gap-2');
+    const actionsBox = el('div', 'flex gap-2');
+    actionsBox.append(...buttons);
+    line.append(el('p', 'text-sm text-white', text), actionsBox);
+    return line;
+  };
+
+  const smallButton = (text: string, onClick: () => void) => {
+    const button = el(
+      'button',
+      'min-h-10 rounded-xl bg-white/10 px-3 text-sm font-semibold text-white hover:bg-white/20',
+      text,
+    );
+    button.type = 'button';
+    button.addEventListener('click', onClick);
+    return button;
+  };
+
+  function editName(): void {
+    const name = textInput('player-name', 'text', 'Shown on the leaderboard', state.name ?? '');
+    // "nickname" keeps password managers from treating this as a login field.
+    name.setAttribute('autocomplete', 'nickname');
+    const button = submitButton('Save');
+    showForm(
+      form('Your name', name, button, () => {
+        const parsed = PlayerNameSchema.safeParse(name.value);
+        if (!parsed.success) {
+          message.textContent = parsed.error.issues[0]?.message ?? 'Invalid name';
+          return;
+        }
+        run(
+          button,
+          () => actions.link(parsed.data),
+          () => {
+            state = { name: parsed.data, protected: false, needsLogin: null };
+            render();
+          },
+        );
+      }),
+      name,
+    );
+  }
+
+  function editPassword(): void {
+    const password = textInput('player-new-password', 'password', 'At least 8 characters');
+    password.autocomplete = 'new-password';
+    const protect = submitButton('Protect');
+    showForm(
+      form('Password (stops anyone else using your name)', password, protect, () => {
+        const parsed = PasswordSchema.safeParse(password.value);
+        if (!parsed.success) {
+          message.textContent = parsed.error.issues[0]?.message ?? 'Invalid password';
+          return;
+        }
+        run(
+          protect,
+          () => actions.protect(parsed.data),
+          () => {
+            state = { ...state, protected: true };
+            render();
+          },
+        );
+      }),
+      password,
+    );
+  }
+
+  /**
+   * The resting view has no text fields at all: on Android an input on screen brings up the
+   * autofill strip, which shrinks the app. Fields appear only when the player taps to edit.
+   */
   function render(): void {
     section.replaceChildren();
 
@@ -336,7 +415,7 @@ export function accountSection(account: Account, actions: AccountActions): HTMLE
       const password = textInput('player-password', 'password', 'Password');
       const button = submitButton('Log in');
       const name = state.needsLogin;
-      section.append(
+      showForm(
         form(`Log in as ${name}`, password, button, () => {
           run(
             button,
@@ -347,9 +426,13 @@ export function accountSection(account: Account, actions: AccountActions): HTMLE
             },
           );
         }),
+        password,
       );
-    } else if (state.name && state.protected) {
-      const button = actionButton('Log out', () => {
+      return;
+    }
+
+    if (state.name && state.protected) {
+      const button = smallButton('Log out', () => {
         run(
           button,
           () => actions.logout(),
@@ -359,56 +442,20 @@ export function accountSection(account: Account, actions: AccountActions): HTMLE
           },
         );
       });
-      section.append(el('p', 'text-sm text-white', `Signed in as ${state.name}.`), button);
-    } else {
-      const name = textInput('player-name', 'text', 'Shown on the leaderboard', state.name ?? '');
-      const button = submitButton('Save');
+      section.append(row(`Signed in as ${state.name}`, button));
+    } else if (state.name) {
       section.append(
-        form('Your name', name, button, () => {
-          const parsed = PlayerNameSchema.safeParse(name.value);
-          if (!parsed.success) {
-            message.textContent = parsed.error.issues[0]?.message ?? 'Invalid name';
-            return;
-          }
-          run(
-            button,
-            () => actions.link(parsed.data),
-            () => {
-              state = { name: parsed.data, protected: false, needsLogin: null };
-              render();
-            },
-          );
-        }),
+        row(`Your name: ${state.name}`, smallButton('Change', editName)),
+        actionButton('Protect it with a password', editPassword),
       );
-
-      if (state.name) {
-        const password = textInput('player-new-password', 'password', 'At least 8 characters');
-        password.autocomplete = 'new-password';
-        const protect = submitButton('Protect');
-        section.append(
-          form('Password (stops anyone else using your name)', password, protect, () => {
-            const parsed = PasswordSchema.safeParse(password.value);
-            if (!parsed.success) {
-              message.textContent = parsed.error.issues[0]?.message ?? 'Invalid password';
-              return;
-            }
-            run(
-              protect,
-              () => actions.protect(parsed.data),
-              () => {
-                state = { ...state, protected: true };
-                render();
-              },
-            );
-          }),
-        );
-      }
+    } else {
+      section.append(actionButton('Add your name', editName));
     }
 
     if (!message.textContent) {
       message.textContent = state.name
         ? `Your games sync to ${state.name}.`
-        : 'Add a name to sync your games and join the leaderboard. Once it’s saved, you can protect it with a password.';
+        : 'Add a name to sync your games and join the leaderboard.';
     }
     section.append(message);
   }
@@ -451,3 +498,75 @@ export function actionButton(text: string, onClick: () => void): HTMLButtonEleme
 }
 
 export { el };
+
+const METRIC_LABELS: Record<Metric, string> = { time: 'Time', moves: 'Moves', score: 'Score' };
+const formatMetric = (metric: Metric, value: number): string =>
+  metric === 'time' ? formatDuration(value) : formatNumber(value);
+
+function badge(text: string, tone: 'personal' | 'record'): HTMLElement {
+  return el(
+    'span',
+    `ml-1.5 inline-block rounded-full px-1.5 py-0.5 align-middle text-[0.65rem] font-semibold uppercase tracking-wide ${
+      tone === 'record' ? 'bg-amber-300 text-stone-900' : 'bg-white/20 text-white'
+    }`,
+    text,
+  );
+}
+
+/**
+ * The won game against your previous best and the best on record. `globalState` says whether
+ * records are still loading or couldn't be fetched, so the Everyone column can say so.
+ */
+export function winSummary(
+  rows: readonly MetricComparison[],
+  globalState: 'loading' | 'ready' | 'offline',
+): HTMLElement {
+  const table = el('table', 'w-full text-left text-sm tabular-nums');
+  const head = el('thead', 'text-xs text-white/60');
+  const headRow = el('tr');
+  for (const label of ['', 'This game', 'Your best', 'Everyone']) {
+    const th = el('th', 'pb-2 font-medium', label);
+    th.scope = 'col';
+    headRow.append(th);
+  }
+  head.append(headRow);
+
+  const body = el('tbody');
+  for (const row of rows) {
+    const tr = el('tr', 'border-t border-white/10 align-top');
+    const label = el('th', 'py-2 pr-2 font-medium text-white/70', METRIC_LABELS[row.metric]);
+    label.scope = 'row';
+
+    const current = el(
+      'td',
+      'py-2 pr-2 font-semibold text-white',
+      formatMetric(row.metric, row.value),
+    );
+    if (row.newRecord) current.append(badge('Record', 'record'));
+    else if (row.newPersonalBest)
+      current.append(badge(row.personal === null ? 'First' : 'Best', 'personal'));
+
+    const personal = el(
+      'td',
+      'py-2 pr-2 text-white/80',
+      row.personal === null ? '—' : formatMetric(row.metric, row.personal),
+    );
+
+    const everyone = el('td', 'py-2 text-white/80');
+    if (row.global) {
+      everyone.append(
+        el('span', 'block', formatMetric(row.metric, row.global.value)),
+        el('span', 'block truncate text-xs text-white/50', row.global.name),
+      );
+    } else {
+      everyone.textContent =
+        globalState === 'loading' ? '…' : globalState === 'offline' ? 'Offline' : '—';
+    }
+
+    tr.append(label, current, personal, everyone);
+    body.append(tr);
+  }
+
+  table.append(head, body);
+  return table;
+}

@@ -4,11 +4,16 @@ import { expect, test, type Page } from '@playwright/test';
 const cardFont = (page: Page) =>
   page.locator('[data-key] svg text').first().getAttribute('font-family');
 
-test('opening settings does not focus the name field', async ({ page }) => {
+test('settings opens with no text fields until you choose to edit', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Settings' }).click();
-  await expect(page.getByRole('dialog')).toBeVisible();
-  await expect(page.getByLabel('Your name')).not.toBeFocused();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  // Any field on screen brings up Android's autofill strip, which shrinks the app.
+  await expect(dialog.locator('input:not([type=checkbox]), select, textarea')).toHaveCount(0);
+
+  await dialog.getByRole('button', { name: 'Add your name' }).click();
+  await expect(dialog.getByLabel('Your name')).toBeFocused();
 });
 
 test('previews card styles on the table, then cancels or saves', async ({ page }) => {

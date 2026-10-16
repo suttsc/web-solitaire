@@ -83,6 +83,11 @@ test('wins a solver-found deal by tapping, and records the win', async ({ page }
   }
 
   await expect(page.getByRole('heading', { name: 'You won!' })).toBeVisible();
+  // First win on this device: every row is a personal best, compared against everyone's records.
+  const summary = page.getByRole('dialog').getByRole('table');
+  await expect(summary.getByRole('columnheader', { name: 'Your best' })).toBeVisible();
+  await expect(summary.getByRole('row', { name: /^Time/ })).toContainText(/First|Record/);
+  await expect(summary).not.toContainText('…');
   await page.getByRole('button', { name: 'Close' }).click();
   await page.getByRole('button', { name: 'Stats' }).click();
   await page.getByRole('radio', { name: 'Draw 1' }).click();
@@ -96,9 +101,11 @@ test('protects a name with a password and logs in on another browser', async ({ 
   const first = await browser.newPage();
   await first.goto('/');
   await first.getByRole('button', { name: 'Settings' }).click();
+  await first.getByRole('button', { name: 'Add your name' }).click();
   await first.getByLabel('Your name').fill(name);
   await first.getByRole('button', { name: 'Save' }).click();
   await expect(first.getByText(`Welcome, ${name}!`)).toBeVisible();
+  await first.getByRole('button', { name: 'Protect it with a password' }).click();
   await first.getByLabel(/Password/).fill('correct horse');
   await first.getByRole('button', { name: 'Protect' }).click();
   await expect(first.getByText('Your name is protected.')).toBeVisible();
@@ -106,6 +113,7 @@ test('protects a name with a password and logs in on another browser', async ({ 
   const second = await browser.newPage();
   await second.goto('/');
   await second.getByRole('button', { name: 'Settings' }).click();
+  await second.getByRole('button', { name: 'Add your name' }).click();
   await second.getByLabel('Your name').fill(name);
   await second.getByRole('button', { name: 'Save' }).click();
   await expect(second.getByText('This name is protected.')).toBeVisible();

@@ -128,6 +128,15 @@ app.get(
   },
 );
 
+app.get(
+  '/records',
+  zValidator('query', DrawQuerySchema.extend({ exclude: z.uuid().optional() })),
+  async (c) => {
+    const { draw, exclude } = c.req.valid('query');
+    return c.json(await createRepository(c.env.DB).records(draw, exclude ?? null));
+  },
+);
+
 app.get('/stats/global', zValidator('query', DrawQuerySchema), async (c) => {
   return c.json(await createRepository(c.env.DB).globalStats(c.req.valid('query').draw));
 });

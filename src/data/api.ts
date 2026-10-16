@@ -5,6 +5,7 @@ import {
   GlobalStatsResponseSchema,
   LeaderboardResponseSchema,
   PlayerGamesResponseSchema,
+  RecordsResponseSchema,
   UploadGamesResponseSchema,
   type DrawModeValue,
   type GameRecord,
@@ -74,6 +75,12 @@ export function createApi(fetchImpl: Fetch = (...args) => fetch(...args), base =
 
     leaderboard: (drawMode: DrawModeValue, by: LeaderboardMetric) =>
       call(LeaderboardResponseSchema, `/leaderboard?draw=${drawMode}&by=${by}`),
+
+    records: (drawMode: DrawModeValue, excludeGameId?: string) =>
+      call(
+        RecordsResponseSchema,
+        `/records?draw=${drawMode}${excludeGameId ? `&exclude=${excludeGameId}` : ''}`,
+      ),
 
     globalStats: (drawMode: DrawModeValue) =>
       call(GlobalStatsResponseSchema, `/stats/global?draw=${drawMode}`),

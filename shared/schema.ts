@@ -77,6 +77,16 @@ export const LeaderboardResponseSchema = z.object({
   entries: z.array(LeaderboardEntrySchema),
 });
 
+const RecordSchema = z.object({ name: z.string(), value: z.number() }).nullable();
+
+/** The best win on record for each metric (wins only; score compares standard scoring only). */
+export const RecordsResponseSchema = z.object({
+  drawMode: DrawModeSchema,
+  time: RecordSchema,
+  moves: RecordSchema,
+  score: RecordSchema,
+});
+
 export const GlobalStatsResponseSchema = z.object({
   drawMode: DrawModeSchema,
   players: z.number().int(),
@@ -94,3 +104,4 @@ export type Player = z.infer<typeof PlayerSchema>;
 export type LeaderboardMetric = z.infer<typeof LeaderboardMetricSchema>;
 export type LeaderboardResponse = z.infer<typeof LeaderboardResponseSchema>;
 export type GlobalStatsResponse = z.infer<typeof GlobalStatsResponseSchema>;
+export type RecordsResponse = z.infer<typeof RecordsResponseSchema>;

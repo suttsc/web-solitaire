@@ -4,6 +4,7 @@ import type {
   GlobalStatsResponse,
   LeaderboardMetric,
   Player,
+  RecordsResponse,
 } from '../shared/schema';
 
 interface GameRow {
@@ -182,6 +183,26 @@ export function createRepository(db: D1Database) {
         .bind(drawMode, limit)
         .all<{ name: string; value: number; endedAt: string }>();
       return results;
+    },
+
+    /** The single best win per metric, optionally ignoring one game (the one just finished). */
+    async records(drawMode: DrawModeValue, excludeId: string | null): Promise<RecordsResponse> {
+      const best = (value: string, extra: string, order: 'ASC' | 'DESC') =>
+        db
+          .prepare(
+            `SELECT p.name AS name, ${value} AS value
+             FROM games g JOIN players p ON p.id = g.player_id
+             WHERE g.draw_mode = ? AND g.result = 'won' AND g.id != ? ${extra}
+             ORDER BY value ${order}, g.ended_at ASC LIMIT 1`,
+          )
+          .bind(drawMode, excludeId ?? '')
+          .first<{ name: string; value: number }>();
+      const [time, moves, score] = await Promise.all([
+        best('g.duration_ms', '', 'ASC'),
+        best('g.moves', '', 'ASC'),
+        best('g.score', "AND g.scoring_mode = 'standard'", 'DESC'),
+      ]);
+      return { drawMode, time, moves, score };
     },
 
     async globalStats(drawMode: DrawModeValue): Promise<GlobalStatsResponse> {
