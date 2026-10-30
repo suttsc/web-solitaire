@@ -38,6 +38,20 @@ npm run db:migrate:remote
 npm run deploy                          # serves on <name>.<account>.workers.dev
 ```
 
+### Deploying from GitHub (Cloudflare Workers Builds)
+
+The Vite build writes the deploy config (including where the static assets are), so Workers Builds
+must build before it deploys. In the Worker's **Settings → Build**:
+
+- **Build command:** `npm run build`
+- **Deploy command:** `npx wrangler deploy`
+- **Production branch:** `main`
+
+Without the build command the deploy fails with "The `assets` property in your configuration is
+missing the required `directory` property". Apply new D1 migrations with
+`npm run db:migrate:remote` (or prefix the deploy command with
+`npx wrangler d1 migrations apply DB --remote &&`).
+
 ## Scripts
 
 | Script                      | What it does                                           |
